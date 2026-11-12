@@ -1,0 +1,20 @@
+{
+  "name": "openbyok",
+  "displayName": "MultiProvider x OpenCode BYOK",
+  "description": "Register models as VS Code BYOK (Bring Your Own Key) from OpenCode API linked to different providers (OpenAI, Azure OpenAI, Anthropic, Google Gemini, etc.)",
+  "version": "0.1.0",
+  "publisher": "qentah",
+  "engines": { "vscode": "^1.95.0" },
+  "categories": ["Other"],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "openbyok.registerToken", "title": "OpenBYOK: Register API Token (st_…)" },
+      { "command": "openbyok.selectModels", "title": "OpenBYOK: Select Models for BYOK" },
+      { "command": "openbyok.refreshToken", "title": "OpenBYOK: Refresh Token" },
+      { "command": "openbyok.logout", "title": "OpenBYOK: Logout" },
+      { "command": "openbyok.runBenchmark", "title": "OpenBYOK: Run Benchmark (with progress)" },
+      { "command": "openbyok.clearCache", "title": "OpenBYOK: Clear Benchmark Cache" }
+    ]
+  }
+}
