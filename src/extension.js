@@ -541,12 +541,11 @@ async function selectModels() {
     return;
   }
 
-  // Use cached benchmark results if fresh
+  // Use cached benchmark results if fresh; otherwise offer a live benchmark first
   const cacheAge = benchmarkCache?.timestamp ? Date.now() - benchmarkCache.timestamp : null;
   const cacheAgeStr = cacheAge !== null ? `${Math.round(cacheAge / 3600000)}h ago` : 'no cache';
   const useCache = isCacheFresh();
 
-  // If no fresh cache, run benchmark with progress first, then show selection
   if (!useCache) {
     const runNow = await vscode.window.showInformationMessage(
       `No fresh benchmark cache (${cacheAgeStr}). Run benchmark now?`,
@@ -565,8 +564,34 @@ async function selectModels() {
     for (const r of benchmarkCache.results) benchMap.set(r.key, r);
   }
 
-  // Build items from cache or defaults
-  const benchResults = models.map(m => {
+  // Group models by provider
+  const providers = new Map();
+  for (const m of models) {
+    if (!providers.has(m.providerID)) {
+      providers.set(m.providerID, { providerID: m.providerID, baseURL: m.baseURL, models: [] });
+    }
+    providers.get(m.providerID).models.push(m);
+  }
+
+  // ---------- Step 1: choose a provider ----------
+  const providerItems = [...providers.values()].map(g => ({
+    label: g.providerID,
+    description: `${g.models.length} model(s)`,
+    detail: g.baseURL,
+    alwaysShow: true,
+  }));
+  const providerChoice = await vscode.window.showQuickPick(providerItems, {
+    canPickMany: false,
+    placeHolder: 'Choose the provider whose models you want to add to BYOK',
+    title: 'OpenBYOK — Select Provider',
+  });
+  if (!providerChoice) return;
+  const group = providers.get(providerChoice.label);
+
+  // ---------- Step 2: choose models of that provider ----------
+  const statusOrder = { OK: 0, SLOW: 1, UNKNOWN: 2, NO_TOKENS: 3, TIMEOUT: 4, ERROR: 5 };
+
+  const benchResults = group.models.map(m => {
     const cached = benchMap.get(m.key);
     const bench = cached ? {
       status: cached.status,
@@ -577,8 +602,6 @@ async function selectModels() {
     return { model: m, bench };
   });
 
-  // Sort: OK first, then SLOW, then KO, then UNKNOWN
-  const statusOrder = { OK: 0, SLOW: 1, UNKNOWN: 2, NO_TOKENS: 3, TIMEOUT: 4, ERROR: 5 };
   benchResults.sort((a, b) => {
     const sa = statusOrder[a.bench.status] ?? 6;
     const sb = statusOrder[b.bench.status] ?? 6;
@@ -602,7 +625,7 @@ async function selectModels() {
     const errInfo = b.error ? ` — ${b.error.slice(0, 60)}` : '';
     const cacheInfo = useCache ? ` [cache ${cacheAgeStr}]` : '';
     return {
-      label: `${statusLabel}  ${m.key}`,
+      label: `${statusLabel}  ${m.modelID}`,
       description: `${ctx}  |  ${toks}  |  ${ttft}${errInfo}${cacheInfo}`.trim(),
       picked: b.status === 'OK' || b.status === 'UNKNOWN',
       model: m,
@@ -612,67 +635,56 @@ async function selectModels() {
 
   const selected = await vscode.window.showQuickPick(items, {
     canPickMany: true,
-    placeHolder: `Select models to add to VS Code BYOK (cache: ${cacheAgeStr})`,
-    title: 'OpenCode Console Models — OK / SLOW / KO',
+    placeHolder: `Select models from ${providerChoice.label} to add to VS Code BYOK (cache: ${cacheAgeStr})`,
+    title: `OpenCode Console — ${providerChoice.label}`,
   });
   if (!selected || selected.length === 0) return;
 
-  // Group selected by provider
-  const groups = new Map();
-  for (const s of selected) {
-    const m = s.model;
-    if (!groups.has(m.providerID)) {
-      groups.set(m.providerID, { providerID: m.providerID, baseURL: m.baseURL, models: [] });
-    }
-    groups.get(m.providerID).models.push(m);
-  }
+  // Build consolidated chatLanguageModels.json entry for this provider only
+  const byokEntry = {
+    name: `OpenCode ${providerChoice.label}`,
+    vendor: 'customendpoint',
+    apiKey: `\${input:${INPUT_ID}}`,
+    apiType: 'chat-completions',
+    models: selected.map(s => {
+      const m = s.model;
+      const entry = {
+        id: m.modelID,
+        name: m.name,
+        url: `${group.baseURL.replace(/\/+$/, '')}/chat/completions`,
+        toolCalling: m.toolCalling,
+        vision: m.hasImageInput,
+        maxInputTokens: m.maxInputTokens,
+        maxOutputTokens: m.maxOutputTokens,
+      };
+      if (m.reasoning) entry.thinking = true;
+      if (Array.isArray(m.reasoningEfforts) && m.reasoningEfforts.length > 0) {
+        entry.supportsReasoningEffort = m.reasoningEfforts;
+        entry.reasoningEffortFormat = 'chat-completions';
+      }
+      if (m.description) entry.description = m.description;
+      else entry.description = `${m.name} — OpenCode Console model (${m.providerID})`;
+      if (m.family) entry.family = m.family;
+      if (m.releaseDate) entry.releaseDate = m.releaseDate;
+      return entry;
+    }),
+  };
 
-  // Build consolidated chatLanguageModels.json entries
-  const byokEntries = [];
-  for (const [pid, g] of groups) {
-    byokEntries.push({
-      name: `OpenCode ${pid}`,
-      vendor: 'customendpoint',
-      apiKey: `\${input:${INPUT_ID}}`,
-      apiType: 'chat-completions',
-      models: g.models.map(m => {
-        const entry = {
-          id: m.modelID,
-          name: m.name,
-          url: `${g.baseURL.replace(/\/+$/, '')}/chat/completions`,
-          toolCalling: m.toolCalling,
-          vision: m.hasImageInput,
-          maxInputTokens: m.maxInputTokens,
-          maxOutputTokens: m.maxOutputTokens,
-        };
-        if (m.reasoning) entry.thinking = true;
-        if (Array.isArray(m.reasoningEfforts) && m.reasoningEfforts.length > 0) {
-          entry.supportsReasoningEffort = m.reasoningEfforts;
-          entry.reasoningEffortFormat = 'chat-completions';
-        }
-        if (m.description) entry.description = m.description;
-        else entry.description = `${m.name} — OpenCode Console model (${m.providerID})`;
-        if (m.family) entry.family = m.family;
-        if (m.releaseDate) entry.releaseDate = m.releaseDate;
-        return entry;
-      }),
-    });
-  }
-
-  // Merge with existing chatLanguageModels.json
+  // Merge with existing chatLanguageModels.json: replace only this provider's entry,
+  // keep entries for other providers intact.
   const clmPath = getChatLanguageModelsPath();
   let existing = [];
   try { existing = JSON.parse(fs.readFileSync(clmPath, 'utf8')); } catch {}
   if (!Array.isArray(existing)) existing = [];
 
-  const filtered = existing.filter(e => !String(e?.name ?? '').startsWith('OpenCode '));
-  const merged = [...filtered, ...byokEntries];
+  const filtered = existing.filter(e => String(e?.name ?? '') !== `OpenCode ${providerChoice.label}`);
+  const merged = [...filtered, byokEntry];
   fs.writeFileSync(clmPath, JSON.stringify(merged, null, 2));
 
   await ensureInputDefinition();
 
   vscode.window.showInformationMessage(
-    `Added ${selected.length} consolidated model(s) to BYOK. Reload VS Code to see them in the model picker.`
+    `Added ${selected.length} model(s) from "${providerChoice.label}" to BYOK. Reload VS Code to see them in the model picker.`
   );
 }
 
