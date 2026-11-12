@@ -139,7 +139,6 @@ Après écriture de `chatLanguageModels.json`, **recharger la fenêtre VS Code**
 - "Pourquoi `selectModels()` ne trie pas par provider avant par statut ? Corrige."
 - "Modifie le texte de descrîption par défaut pour inclure le `baseURL`."
 - "L'extension rate si le token est expiré — ajoute un test de validité avant `fetchConsolidatedModels`."
-- "Crée une version TypeScript de `src/extension.js` avec `tsc`."
 
 ---
 
