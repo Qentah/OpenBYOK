@@ -9,20 +9,27 @@ const { normUrl } = require('../../core/utils');
 const benchmark = require('../benchmark/commands');
 
 /**
- * Native BYOK credential id for our group, mirroring what VS Code's
- * "Update API Key" generates: apiKey = ${input:chat.lm.secret.XXXX} with the
- * secret stored in VS Code's own SecretStorage. Reuse the id already present
- * on an existing OpenBYOK group so the stored secret survives re-selection;
- * otherwise derive a stable id from the provider name.
+ * Native BYOK credential reference for our group. We NEVER invent a
+ * `chat.lm.secret.X` id ourselves: those ids belong to VS Code's own secret
+ * storage and are created only when the user configures a key through the
+ * native "Manage Language Models → Update API Key" flow (the same mechanism
+ * the opencode-copilot-chat reference extension relies on). An extension-side
+ * hash can never match a VS Code-generated id, so it produces a dead
+ * reference that resolves to nothing.
+ *
+ * Correct-by-the-spec behaviour:
+ *   - Re-selecting an existing group keeps its current `${input:...}` so the
+ *     already-stored secret survives.
+ *   - A brand-new group is written WITHOUT any apiKey. VS Code then shows the
+ *     group in Manage Language Models and prompts the user to set the key once;
+ *     it stores the value natively and rewrites chatLanguageModels.json with
+ *     its own `${input:chat.lm.secret.X}` id. No extension-side secret sync.
  */
-function resolveByokInputId(existingEntry, providerID) {
+function resolveByokApiKey(existingEntry) {
   const m = typeof existingEntry?.apiKey === 'string'
-    ? existingEntry.apiKey.match(/\$\{input:(chat\.lm\.secret\.[^}]+)\}/)
+    ? existingEntry.apiKey.match(/\$\{input:[^}]+\}/)
     : null;
-  if (m) return m[1];
-  let h = 5381;
-  for (const c of `openbyok:${providerID}`) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0;
-  return `chat.lm.secret.${h.toString(16).padStart(8, '0').slice(0, 8)}`;
+  return m ? m[0] : undefined; // undefined => omit the field entirely
 }
 
 /* ---------- Auth commands ---------- */
@@ -188,11 +195,10 @@ async function selectModels() {
   const existingEntry = (vsConfig.readChatLanguageModels() ?? []).find(
     (e) => String(e?.name ?? '') === `OpenBYOK ${providerChoice.label}`
   );
-  const inputId = resolveByokInputId(existingEntry, providerChoice.label);
+  const apiKeyRef = resolveByokApiKey(existingEntry);
   const byokEntry = {
     name: `OpenBYOK ${providerChoice.label}`,
     vendor: 'customendpoint',
-    apiKey: `\${input:${inputId}}`,
     apiType: 'chat-completions',
     models: selected.map((s) => {
       const m = s.model;
@@ -217,14 +223,18 @@ async function selectModels() {
     }),
   };
 
+  // Preserve an existing native credential reference so a stored secret
+  // survives re-selection. A brand-new group is written without apiKey: VS
+  // Code owns the id and stores the value when the user sets the key in
+  // Manage Language Models (it then rewrites this file with its own id).
+  if (apiKeyRef) byokEntry.apiKey = apiKeyRef;
+
   vsConfig.upsertChatLanguageModel(byokEntry);
 
-  // The ${input:chat.lm.secret.X} reference is resolved by VS Code itself:
-  // on first use it prompts for the key once and stores it in its own secret
-  // storage (same mechanism as "Update API Key"). No extension-side sync needed.
-
   vscode.window.showInformationMessage(
-    `Added ${selected.length} model(s) from "${providerChoice.label}" to BYOK. Reload VS Code, then enter your OpenCode key when prompted — it will be saved natively.`
+    apiKeyRef
+      ? `Updated ${selected.length} model(s) from "${providerChoice.label}" in BYOK. Existing API key kept. Reload the window.`
+      : `Added ${selected.length} model(s) from "${providerChoice.label}" to BYOK. Open "Manage Language Models", click the group's gear → "Update API Key" and paste your OpenCode key — VS Code stores it natively. Then reload the window.`
   );
 }
 
