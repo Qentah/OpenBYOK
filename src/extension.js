@@ -9,6 +9,8 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
 
+const openGIT = require('./openGIT');
+
 const SECRET_KEY = 'openbyok.opencode.token';
 const INPUT_ID = 'opencodeApiKey';
 const CONSOLE_API = 'https://opencode.ai/console/api/v2/config';
@@ -69,6 +71,7 @@ function activate(context) {
     vscode.commands.registerCommand('openbyok.logout', () => logout()),
     vscode.commands.registerCommand('openbyok.runBenchmark', () => runBenchmarkWithProgress()),
     vscode.commands.registerCommand('openbyok.clearCache', () => clearCache()),
+    openGIT.register(context),
   );
 }
 

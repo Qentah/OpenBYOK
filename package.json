@@ -8,13 +8,33 @@
   "categories": ["Other"],
   "main": "./src/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "OpenBYOK",
+      "properties": {
+        "openbyok.commitModel": {
+          "type": "string",
+          "default": "",
+          "description": "Identifiant du modèle OpenCode utilisé pour générer le message de commit (ex: poolside/laguna-xs-2.1). Laisser vide pour utiliser le premier modèle du cache de benchmark."
+        }
+      }
+    },
     "commands": [
       { "command": "openbyok.registerToken", "title": "OpenBYOK: Register API Token (st_…)" },
       { "command": "openbyok.selectModels", "title": "OpenBYOK: Select Models for BYOK" },
       { "command": "openbyok.refreshToken", "title": "OpenBYOK: Refresh Token" },
       { "command": "openbyok.logout", "title": "OpenBYOK: Logout" },
       { "command": "openbyok.runBenchmark", "title": "OpenBYOK: Run Benchmark (with progress)" },
-      { "command": "openbyok.clearCache", "title": "OpenBYOK: Clear Benchmark Cache" }
-    ]
+      { "command": "openbyok.clearCache", "title": "OpenBYOK: Clear Benchmark Cache" },
+      { "command": "opengit.generateCommitMessage", "title": "OpenGIT: Générer un message de commit", "icon": "$(git-commit)" }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "opengit.generateCommitMessage",
+          "group": "navigation",
+          "when": "scmProvider == git"
+        }
+      ]
+    }
   }
 }
