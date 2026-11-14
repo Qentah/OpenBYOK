@@ -1,6 +1,7 @@
 'use strict';
 
 const opencode = require('./opencode');
+const opencodeGo = require('./opencode-go');
 
 /**
  * Provider registry. The extension core only talks to providers through this
@@ -16,7 +17,7 @@ const opencode = require('./opencode');
  *   resolveModelFor(token, id)   -> Model    (optional, feature-level resolution)
  *   cliExportToken()/cliAvailable() -> optional local-CLI complement
  */
-const providers = new Map([[opencode.id, opencode]]);
+const providers = new Map([[opencode.id, opencode], [opencodeGo.id, opencodeGo]]);
 
 function register(provider) {
   providers.set(provider.id, provider);
