@@ -35,4 +35,16 @@ async function fillScmInputBox(message) {
   return true;
 }
 
-module.exports = { workspaceFolder, getGitDiff, fillScmInputBox };
+/** Last N commit subjects for style consistency. */
+async function getGitLog(n = 5) {
+  const folder = workspaceFolder();
+  if (!folder) return '';
+  try {
+    const { stdout } = await execFileAsync('git', ['log', `-${n}`, '--pretty=format:%s'], { cwd: folder });
+    return stdout?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+module.exports = { workspaceFolder, getGitDiff, fillScmInputBox, getGitLog };
