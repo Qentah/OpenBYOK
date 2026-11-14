@@ -14,7 +14,14 @@ async function listModels() {
   for (const m of items) {
     const id = m?.id;
     if (typeof id !== 'string') continue;
-    // Only openai/v1/chat/completions compatible models for now.
+    const caps = m?.capabilities ?? {};
+    const modalities = m?.modalities ?? null;
+    const hasImageInput = Array.isArray(modalities?.input) &&
+      modalities.input.some((x) => String(x).startsWith('image'));
+    const contextWindow = m?.limit?.context ?? 128000;
+    const maxOutput = m?.limit?.output ?? 16384;
+    const maxInput = m?.limit?.input ?? (contextWindow && maxOutput ? contextWindow - maxOutput : contextWindow);
+    const reasoningEfforts = Array.isArray(caps?.reasoning?.effort) ? caps.reasoning.effort : null;
     rows.push({
       provider: 'opencode-go',
       key: `opencode-go/${id}`,
@@ -22,16 +29,16 @@ async function listModels() {
       modelID: id,
       name: m?.name ?? id,
       description: m?.description ?? null,
-      family: null,
-      releaseDate: null,
-      modalities: null,
-      hasImageInput: false,
-      toolCalling: false,
-      reasoning: false,
-      reasoningEfforts: null,
-      contextWindow: m?.context_length ?? 128000,
-      maxInputTokens: m?.context_length ?? 128000,
-      maxOutputTokens: m?.max_output_tokens ?? 16384,
+      family: m?.family ?? null,
+      releaseDate: m?.release_date ?? null,
+      modalities,
+      hasImageInput,
+      toolCalling: caps?.tools?.supported === true,
+      reasoning: caps?.reasoning?.supported === true,
+      reasoningEfforts,
+      contextWindow,
+      maxInputTokens: maxInput,
+      maxOutputTokens: maxOutput,
       baseURL: GO_BASE_URL,
       prompt: 'Réponds en une phrase courte : qu\'est-ce que la gravité ?',
     });

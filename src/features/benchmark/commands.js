@@ -15,7 +15,18 @@ async function runBackgroundBenchmark() {
   running = true;
   try {
     const token = await tokenStore.getToken();
-    const models = await registry.getDefault().listModels(token);
+    const all = [];
+    for (const provider of registry.list()) {
+      try {
+        const pm = await provider.listModels(token);
+        if (!Array.isArray(pm)) continue;
+        for (const m of pm) {
+          if (provider.id === 'opencode-go' && !/-free$/i.test(m.modelID)) continue;
+          all.push(m);
+        }
+      } catch { /* skip provider */ }
+    }
+    const models = all;
     if (models.length === 0) return;
     const results = await runPool(
       models,
@@ -42,7 +53,26 @@ async function runBenchmarkWithProgress() {
       },
       async (progress, cancelToken) => {
         const token = await tokenStore.getToken();
-        const models = await registry.getDefault().listModels(token);
+        const providerChoice = await vscode.window.showQuickPick(
+          ['All providers', ...registry.list().map((p) => p.id)],
+          { placeHolder: 'Which provider to benchmark?' }
+        );
+        if (!providerChoice) return;
+        const providers = providerChoice === 'All providers'
+          ? registry.list()
+          : [registry.get(providerChoice)];
+        const all = [];
+        for (const provider of providers) {
+          try {
+            const pm = await provider.listModels(token);
+            if (!Array.isArray(pm)) continue;
+            for (const m of pm) {
+              if (provider.id === 'opencode-go' && !/-free$/i.test(m.modelID)) continue;
+              all.push(m);
+            }
+          } catch { /* skip provider */ }
+        }
+        const models = all;
         if (models.length === 0) {
           vscode.window.showWarningMessage('No chat models found.');
           return;

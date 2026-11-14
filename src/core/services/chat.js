@@ -1,7 +1,14 @@
 'use strict';
 
+const { randomUUID } = require('crypto');
 const tokenStore = require('./token-store');
 const { normUrl } = require('../utils');
+
+const SESSION_ID = randomUUID();
+
+function sessionId() {
+  return SESSION_ID;
+}
 
 /**
  * Non-streaming chat completion. Returns the assistant text.
@@ -14,6 +21,7 @@ async function chatCompletion(baseURL, modelID, token, prompt) {
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      'x-opencode-session': sessionId(),
     },
     body: JSON.stringify({
       model: modelID,
@@ -50,6 +58,7 @@ async function chatCompletionStream(baseURL, modelID, token, prompt, onToken, si
       headers: {
         Authorization: `Bearer ${t}`,
         'content-type': 'application/json',
+        'x-opencode-session': sessionId(),
       },
       body,
     });
