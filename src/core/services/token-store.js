@@ -66,23 +66,6 @@ async function getToken() {
   return token;
 }
 
-/**
- * Run an async action that may throw on an expired token.
- * On a 401/refresh-related failure, refresh the token once and retry the action.
- */
-async function withTokenRetry(action) {
-  try {
-    return await action();
-  } catch (e) {
-    const msg = String(e?.message ?? '');
-    if (/401|unauthorized|expired|invalid.*token/i.test(msg)) {
-      try { await refreshToken(); } catch { throw e; }
-      return await action();
-    }
-    throw e;
-  }
-}
-
 async function storeToken(accessToken, { server, refreshToken, expiresInMs } = {}) {
   await secretStorage.store(SECRET_KEY, accessToken);
   if (server !== undefined) await secretStorage.store(KEY_SERVER, server);
@@ -114,4 +97,4 @@ async function authFetch(url, init = {}) {
   return res;
 }
 
-module.exports = { init, getToken, storeToken, deleteToken, refreshToken, withTokenRetry, authFetch };
+module.exports = { init, getToken, storeToken, deleteToken, refreshToken, authFetch };

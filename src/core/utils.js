@@ -1,8 +1,5 @@
 'use strict';
 
-const path = require('path');
-const os = require('os');
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Run async worker(items[i]) over items with bounded concurrency; returns results array. */
@@ -24,10 +21,4 @@ function normUrl(url) {
   return String(url ?? '').replace(/\/+$/, '');
 }
 
-/** Absolute path to the user-level VS Code settings.json. */
-function userSettingsPath() {
-  const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-  return path.join(appData, 'Code', 'User', 'settings.json');
-}
-
-module.exports = { sleep, runPool, normUrl, userSettingsPath };
+module.exports = { sleep, runPool, normUrl };

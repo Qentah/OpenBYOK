@@ -6,7 +6,6 @@ const os = require('os');
 module.exports = {
   // --- Auth / storage ---
   SECRET_KEY: 'openbyok.opencode.token',
-  INPUT_ID: 'opencodeApiKey',
 
   // --- Endpoints ---
   CONSOLE_API: 'https://opencode.ai/console/api/v2/config',
@@ -18,7 +17,7 @@ module.exports = {
   CACHE_FILE: path.join(os.homedir(), '.openbyok-benchmark-cache.json'),
   CACHE_MAX_AGE_MS: 2 * 60 * 60 * 1000, // 2 h
 
-  // --- Benchmark tuning ---S
+  // --- Benchmark tuning ---
   BENCH_TIMEOUT_MS: 15000,
   BENCH_CONCURRENCY: 8,
   BENCH_PROMPT: "Réponds en une phrase courte : qu'est-ce que la gravité ?",
