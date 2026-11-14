@@ -20,8 +20,9 @@ function updateStatusBar() {
   if (cache?.timestamp && Array.isArray(cache.results) && cache.results.length) {
     const fastest = benchCache.fastestModel();
     const ageMin = Math.round((Date.now() - cache.timestamp) / 60000);
-    statusBarItem.text = `$(dashboard) OpenBYOK: ${fastest ? (fastest.name || fastest.modelID) : 'cached'} (${ageMin}m)`;
-    statusBarItem.tooltip = `Benchmark cache: ${cache.results.length} models, ${ageMin} min ago. Click to re-run.`;
+    const spdLabel = fastest?.spd != null ? `${fastest.spd}s/1k` : '';
+    statusBarItem.text = `$(dashboard) OpenBYOK: ${fastest ? (fastest.name || fastest.modelID) : 'cached'} ${spdLabel} (${ageMin}m)`.trim();
+    statusBarItem.tooltip = `Benchmark cache: ${cache.results.length} models, ${ageMin} min ago. Click to view/select model.`;
   } else {
     statusBarItem.text = '$(dashboard) OpenBYOK: no cache';
     statusBarItem.tooltip = 'Click to run benchmark.';
@@ -143,11 +144,53 @@ function clearCache() {
   vscode.window.showInformationMessage('Benchmark cache cleared.');
 }
 
+async function selectFromBenchmark() {
+  let cache = benchCache.data();
+  if (!cache?.results?.length) {
+    const run = await vscode.window.showInformationMessage('No benchmark cache. Run benchmark now?', 'Run Benchmark');
+    if (run === 'Run Benchmark') {
+      const ok = await runBenchmarkWithProgress();
+      if (!ok) return;
+      cache = benchCache.data();
+    } else {
+      return;
+    }
+  }
+  const items = [];
+  const fastest = benchCache.fastestModel();
+  items.push({
+    label: '⚡ Auto (fastest)',
+    description: fastest ? `${fastest.name || fastest.modelID} · ${fastest.spd != null ? fastest.spd + 's/1k' : ''}` : 'no cache',
+    modelID: '',
+  });
+  for (const r of (cache?.results || []).slice().sort((a, b) => (a.spd ?? Infinity) - (b.spd ?? Infinity))) {
+    items.push({
+      label: `${r.name || r.modelID}`,
+      description: `${r.providerID} · spd ${r.spd != null ? r.spd + 's/1k' : '—'} · ${r.tokensPerSec ?? '?'} tok/s · TTFT ${r.ttftMs ?? '?'}ms`,
+      modelID: r.modelID,
+    });
+  }
+  const pick = await vscode.window.showQuickPick(items, {
+    placeHolder: 'Benchmark global — select model to use (Auto = fastest)',
+    title: 'OpenBYOK — Benchmark',
+  });
+  if (!pick) return;
+  const cfg = vscode.workspace.getConfiguration('openbyok');
+  await cfg.update('commitModel', pick.modelID, vscode.ConfigurationTarget.Global);
+  if (pick.modelID === '') {
+    vscode.window.showInformationMessage(`Commit model set to Auto (fastest${fastest ? ': ' + (fastest.name || fastest.modelID) : ''}).`);
+  } else {
+    vscode.window.showInformationMessage(`Commit model set to ${pick.label} (${pick.modelID}).`);
+  }
+  updateStatusBar();
+}
+
 function register(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('openbyok.runBenchmark', () => runBenchmarkWithProgress()),
-    vscode.commands.registerCommand('openbyok.clearCache', () => { benchCache.clear(); updateStatusBar(); vscode.window.showInformationMessage('Benchmark cache cleared.'); }),
+    vscode.commands.registerCommand('openbyok.clearCache', () => clearCache()),
+    vscode.commands.registerCommand('openbyok.selectFromBenchmark', () => selectFromBenchmark()),
   );
 }
 
-module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar };
+module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark };

@@ -14,7 +14,7 @@ and `src/features/` (byok, benchmark, opengit).
 - Auto-generates `chatLanguageModels.json` groups named `OpenBYOK <provider>` (vendor `customendpoint`, apiType `chat-completions`)
 - Console token stored in VS Code SecretStorage (encrypted, OS-level) with automatic refresh + retry-on-401 network wrapper (`authFetch`)
 - Background benchmark cache (`~/.openbyok-benchmark-cache.json`, TTL 2 h) refreshed only when expired, plus a cancellable progress command
-- `OpenGIT`: generates a conventional commit message from the git diff and prefills the Source Control input box (never commits directly)
+- `OpenBYOK`: generates a conventional commit message from the git diff and prefills the Source Control input box (never commits directly)
 
 ## Installation (from source — no compilation needed)
 
@@ -66,10 +66,10 @@ code --install-extension openbyok-0.1.0.vsix
 | `OpenBYOK: Refresh Token` | force a `refresh_token` round-trip |
 | `OpenBYOK: Logout` | delete the 4 SecretStorage keys |
 | `OpenBYOK: Remove a BYOK Group` | remove an `OpenBYOK …` group from `chatLanguageModels.json` |
-| `OpenBYOK: Select Commit Model` | QuickPick from benchmark cache to set the commit model |
+| `OpenBYOK: Select Model from Benchmark` | status-bar click → global benchmark QuickPick, choose Auto or a model |
 | `OpenBYOK: Run Benchmark (with progress)` | live benchmark, writes the cache |
 | `OpenBYOK: Clear Benchmark Cache` | wipe memory cache + JSON file |
-| `OpenGIT: Générer un message de commit` | SCM title-bar button, prefills the commit box |
+| `OpenBYOK: Générer un message de commit` | SCM title-bar button, prefills the commit box |
 
 ## Credentials model (important)
 Two different secrets are involved and must not be mixed up:

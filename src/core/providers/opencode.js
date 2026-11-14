@@ -155,7 +155,7 @@ async function refreshToken() {
   vscode.window.showInformationMessage('Token refreshed.');
 }
 
-/* ---------- Model resolution for features (e.g. OpenGIT) ---------- */
+/* ---------- Model resolution for features (e.g. OpenBYOK) ---------- */
 
 /** Setting openbyok.commitModel > best cached benchmark > error. */
 async function resolveModelFor(token, settingId) {

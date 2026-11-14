@@ -36,6 +36,12 @@ async function benchmarkModel(model, token, timeoutMs = BENCH_TIMEOUT_MS) {
       } else if (tokenCount > 0 && result.totalMs > 0) {
         result.tokensPerSec = Number((tokenCount / (result.totalMs / 1000)).toFixed(1));
       }
+      // spd = seconds to generate 1000 tokens (TTFT + 1000 / tokensPerSec)
+      if (result.tokensPerSec && result.tokensPerSec > 0) {
+        result.spd = Number((result.ttftMs / 1000 + 1000 / result.tokensPerSec).toFixed(2));
+      } else {
+        result.spd = null;
+      }
     }
     if (tokenCount === 0) result.status = 'NO_TOKENS';
     else if (result.ttftMs > BENCH_SLOW_TTFT_MS) result.status = 'SLOW';
@@ -59,6 +65,7 @@ function toCacheEntry(model, bench) {
     totalMs: bench.totalMs,
     tokens: bench.tokens,
     tokensPerSec: bench.tokensPerSec,
+    spd: bench.spd ?? null,
     contextWindow: model.contextWindow,
     maxOutputTokens: model.maxOutputTokens,
     hasImageInput: model.hasImageInput,

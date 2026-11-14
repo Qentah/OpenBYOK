@@ -43,10 +43,14 @@ function getEntry(key) {
 function fastestModel() {
   const valid = (cache?.results || [])
     .filter((r) => r?.baseURL && r?.modelID)
-    .sort((a, b) => ((b.tokensPerSec ?? 0) - (a.tokensPerSec ?? 0)) ||
-      ((a.ttftMs ?? Infinity) - (b.ttftMs ?? Infinity)));
+    .sort((a, b) => {
+      const sa = a.spd ?? Infinity;
+      const sb = b.spd ?? Infinity;
+      if (sa !== sb) return sa - sb;
+      return (a.ttftMs ?? Infinity) - (b.ttftMs ?? Infinity);
+    });
   if (!valid[0]) return null;
-  return { baseURL: valid[0].baseURL, modelID: valid[0].modelID, name: valid[0].name || valid[0].modelID };
+  return { baseURL: valid[0].baseURL, modelID: valid[0].modelID, name: valid[0].name || valid[0].modelID, spd: valid[0].spd };
 }
 
 function clear() {

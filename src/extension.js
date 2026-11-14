@@ -18,7 +18,7 @@ function activate(context) {
   benchCache.load();
 
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-  statusBarItem.command = 'openbyok.runBenchmark';
+  statusBarItem.command = 'openbyok.selectFromBenchmark';
   context.subscriptions.push(statusBarItem);
   benchmark.setStatusBarItem(statusBarItem);
   benchmark.updateStatusBar();

@@ -91,7 +91,7 @@ Clés SecretStorage (dans `token-store.js`) : `openbyok.opencode.token`, et dér
 | `openbyok.removeGroup` | features/byok | Supprime un groupe BYOK de chatLanguageModels.json |
 | `openbyok.runBenchmark` | features/benchmark | Benchmark avec barre de progression, annulable, écrit le cache |
 | `openbyok.clearCache` | features/benchmark | Vide cache mémoire + fichier |
-| `opengit.generateCommitMessage` | features/opengit | Diff git → message → préremplit la SCM input box (bouton dans la barre SCM) |
+| `openbyok.selectFromBenchmark` | features/benchmark | Status-bar click : benchmark global + sélection auto/modèle |
 | `openbyok.selectCommitModel` | features/opengit | QuickPick pour choisir le modèle de commit (depuis le cache benchmark) |
 
 ---

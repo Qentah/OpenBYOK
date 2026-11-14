@@ -55,7 +55,8 @@
       { "command": "openbyok.removeGroup", "title": "OpenBYOK: Remove a BYOK Group" },
       { "command": "openbyok.runBenchmark", "title": "OpenBYOK: Run Benchmark (with progress)" },
       { "command": "openbyok.clearCache", "title": "OpenBYOK: Clear Benchmark Cache" },
-      { "command": "opengit.generateCommitMessage", "title": "OpenGIT: Générer un message de commit", "icon": "$(git-commit)" },
+      { "command": "openbyok.selectFromBenchmark", "title": "OpenBYOK: Select Model from Benchmark" },
+      { "command": "openbyok.generateCommitMessage", "title": "OpenBYOK: Générer un message de commit", "icon": "$(git-commit)" },
       { "command": "openbyok.selectCommitModel", "title": "OpenBYOK: Select Commit Model" }
     ],
     "languageModelChatProviders": [
@@ -79,7 +80,7 @@
     "menus": {
       "scm/title": [
         {
-          "command": "opengit.generateCommitMessage",
+          "command": "openbyok.generateCommitMessage",
           "group": "navigation",
           "when": "scmProvider == git"
         }

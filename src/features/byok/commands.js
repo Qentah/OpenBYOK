@@ -173,21 +173,22 @@ async function selectModels() {
     const sa = statusOrder[a.bench.status] ?? 6;
     const sb = statusOrder[b.bench.status] ?? 6;
     if (sa !== sb) return sa - sb;
-    const ta = a.bench.tokensPerSec ?? 0;
-    const tb = b.bench.tokensPerSec ?? 0;
-    if (ta !== tb) return tb - ta;
+    const spa = a.bench.spd ?? Infinity;
+    const spb = b.bench.spd ?? Infinity;
+    if (spa !== spb) return spa - spb;
     return a.model.key.localeCompare(b.model.key);
   });
 
   const items = benchResults.map(({ model: m, bench: b }) => {
     const ctx = m.contextWindow ? `${Math.round(m.contextWindow / 1000)}k ctx` : '? ctx';
+    const spd = b.spd !== null ? `${b.spd}s/1k` : '— s/1k';
     const toks = b.tokensPerSec !== null ? `${b.tokensPerSec} tok/s` : '— tok/s';
     const ttft = b.ttftMs !== null ? `TTFT ${b.ttftMs}ms` : '';
     const errInfo = b.error ? ` — ${b.error.slice(0, 60)}` : '';
     const cacheInfo = useCache ? ` [cache ${cacheAgeStr}]` : '';
     return {
       label: `${statusIcon[b.status] ?? '❓'}  ${m.modelID}`,
-      description: `${ctx}  |  ${toks}  |  ${ttft}${errInfo}${cacheInfo}`.trim(),
+      description: `${ctx}  |  spd ${spd}  |  ${toks}  |  ${ttft}${errInfo}${cacheInfo}`.trim(),
       picked: b.status === 'OK' || b.status === 'UNKNOWN',
       model: m,
     };
