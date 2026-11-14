@@ -4,6 +4,11 @@ const vscode = require('vscode');
 const { execFileAsync } = require('./proc');
 
 function workspaceFolder() {
+  const active = vscode.window.activeTextEditor?.document?.uri;
+  if (active?.scheme === 'file') {
+    const ws = vscode.workspace.getWorkspaceFolder(active);
+    if (ws) return ws.uri.fsPath;
+  }
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 

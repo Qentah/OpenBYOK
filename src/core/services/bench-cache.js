@@ -19,7 +19,12 @@ function load() {
 
 function save(results) {
   cache = { timestamp: Date.now(), results };
-  try { fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2)); } catch {}
+  try {
+    const tmp = CACHE_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(cache, null, 2));
+    try { fs.chmodSync(tmp, 0o600); } catch {}
+    fs.renameSync(tmp, CACHE_FILE);
+  } catch {}
 }
 
 function isFresh() {

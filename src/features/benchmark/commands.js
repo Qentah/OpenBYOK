@@ -7,8 +7,34 @@ const registry = require('../../core/providers/registry');
 const { runPool } = require('../../core/utils');
 const { benchmarkModel, toCacheEntry } = require('./benchmark');
 const { BENCH_TIMEOUT_MS, BENCH_CONCURRENCY } = require('../../core/constants');
+const logger = require('../../core/services/logger');
 
 let running = false;
+let statusBarItem = null;
+
+function setStatusBarItem(item) { statusBarItem = item; }
+
+function updateStatusBar() {
+  if (!statusBarItem) return;
+  const cache = benchCache.data();
+  if (cache?.timestamp && Array.isArray(cache.results) && cache.results.length) {
+    const fastest = benchCache.fastestModel();
+    const ageMin = Math.round((Date.now() - cache.timestamp) / 60000);
+    statusBarItem.text = `$(dashboard) OpenBYOK: ${fastest ? (fastest.name || fastest.modelID) : 'cached'} (${ageMin}m)`;
+    statusBarItem.tooltip = `Benchmark cache: ${cache.results.length} models, ${ageMin} min ago. Click to re-run.`;
+  } else {
+    statusBarItem.text = '$(dashboard) OpenBYOK: no cache';
+    statusBarItem.tooltip = 'Click to run benchmark.';
+  }
+}
+
+function benchConfig() {
+  const cfg = vscode.workspace.getConfiguration('openbyok');
+  return {
+    timeout: Number(cfg.get('benchTimeoutMs')) || BENCH_TIMEOUT_MS,
+    concurrency: Number(cfg.get('benchConcurrency')) || BENCH_CONCURRENCY,
+  };
+}
 
 async function runBackgroundBenchmark() {
   if (running) return;
@@ -24,17 +50,19 @@ async function runBackgroundBenchmark() {
           if (provider.id === 'opencode-go' && !/-free$/i.test(m.modelID)) continue;
           all.push(m);
         }
-      } catch { /* skip provider */ }
+      } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ }
     }
     const models = all;
     if (models.length === 0) return;
+    const { timeout, concurrency } = benchConfig();
     const results = await runPool(
       models,
-      (m) => benchmarkModel(m, token, BENCH_TIMEOUT_MS).then((r) => toCacheEntry(m, r)),
-      BENCH_CONCURRENCY
+      (m) => benchmarkModel(m, token, timeout).then((r) => toCacheEntry(m, r)),
+      concurrency
     );
     benchCache.save(results);
-  } catch { /* silent in background */ }
+    updateStatusBar();
+  } catch (e) { logger.warn('background benchmark failed', e); /* silent in background */ }
   finally { running = false; }
 }
 
@@ -70,7 +98,7 @@ async function runBenchmarkWithProgress() {
               if (provider.id === 'opencode-go' && !/-free$/i.test(m.modelID)) continue;
               all.push(m);
             }
-          } catch { /* skip provider */ }
+          } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ }
         }
         const models = all;
         if (models.length === 0) {
@@ -83,7 +111,8 @@ async function runBenchmarkWithProgress() {
           models,
           async (m) => {
             if (cancelToken.isCancellationRequested) return null;
-            const r = await benchmarkModel(m, token, BENCH_TIMEOUT_MS);
+            const { timeout } = benchConfig();
+            const r = await benchmarkModel(m, token, timeout);
             done++;
             progress.report({
               message: `${done}/${models.length} — ${m.key} → ${r.status}`,
@@ -91,10 +120,11 @@ async function runBenchmarkWithProgress() {
             });
             return toCacheEntry(m, r);
           },
-          BENCH_CONCURRENCY
+          benchConfig().concurrency
         );
         const valid = results.filter(Boolean);
         benchCache.save(valid);
+        updateStatusBar();
         vscode.window.showInformationMessage(`Benchmark complete: ${valid.length} models cached.`);
       }
     );
@@ -109,14 +139,15 @@ async function runBenchmarkWithProgress() {
 
 function clearCache() {
   benchCache.clear();
+  updateStatusBar();
   vscode.window.showInformationMessage('Benchmark cache cleared.');
 }
 
 function register(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('openbyok.runBenchmark', () => runBenchmarkWithProgress()),
-    vscode.commands.registerCommand('openbyok.clearCache', () => clearCache()),
+    vscode.commands.registerCommand('openbyok.clearCache', () => { benchCache.clear(); updateStatusBar(); vscode.window.showInformationMessage('Benchmark cache cleared.'); }),
   );
 }
 
-module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache };
+module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar };

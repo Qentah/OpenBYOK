@@ -19,24 +19,18 @@ function readJsonSafe(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 }
 
-/**
- * Merge a BYOK provider entry into chatLanguageModels.json, replacing any
- * existing entry with the same name. Returns the merged array.
- */
 function upsertChatLanguageModel(entry) {
   const clmPath = getChatLanguageModelsPath();
   let existing = readJsonSafe(clmPath, []);
   if (!Array.isArray(existing)) existing = [];
   const filtered = existing.filter((e) => String(e?.name ?? '') !== String(entry?.name ?? ''));
   const merged = [...filtered, entry];
-  fs.writeFileSync(clmPath, JSON.stringify(merged, null, 2));
+  const tmp = clmPath + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2));
+  fs.renameSync(tmp, clmPath);
   return merged;
 }
 
-/**
- * Ensure settings.json declares every ${input:X} referenced by
- * chatLanguageModels.json (VS Code fails with "Invalid credential" otherwise).
- */
 function ensureInputDefinition() {
   const settingsPath = userSettingsPath();
   let settings = readJsonSafe(settingsPath, {});
@@ -56,6 +50,7 @@ function ensureInputDefinition() {
       if (m) refs.add(m[1]);
     }
   }
+  settings.inputs = settings.inputs.filter((i) => refs.has(i.id));
   const missing = [...refs].filter((id) => !settings.inputs.some((i) => i.id === id));
   for (const id of missing) {
     settings.inputs.push({ type: 'promptString', id, description: id, password: true });
@@ -69,7 +64,6 @@ function ensureInputDefinition() {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
 }
 
-/** Read the current chatLanguageModels.json array (or [] if missing/invalid). */
 function readChatLanguageModels() {
   const clm = readJsonSafe(getChatLanguageModelsPath(), []);
   return Array.isArray(clm) ? clm : [];

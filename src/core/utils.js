@@ -9,7 +9,11 @@ async function runPool(items, worker, limit) {
   async function runner() {
     while (cursor < items.length) {
       const i = cursor++;
-      results[i] = await worker(items[i]);
+      try {
+        results[i] = await worker(items[i]);
+      } catch (e) {
+        results[i] = null;
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runner));

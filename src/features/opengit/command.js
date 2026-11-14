@@ -4,6 +4,8 @@ const vscode = require('vscode');
 const tokenStore = require('../../core/services/token-store');
 const git = require('../../core/services/git');
 const registry = require('../../core/providers/registry');
+const benchCache = require('../../core/services/bench-cache');
+const benchmark = require('../benchmark/commands');
 const { chatCompletion } = require('../../core/services/chat');
 
 const COMMIT_PROMPT = `You are a git expert. Generate a concise commit message in English (conventional commits style: feat/fix/chore/refactor/docs/test/...) for the following diff. Reply ONLY with the commit message, no explanation, no markdown code block.
@@ -29,6 +31,11 @@ async function generateCommitMessage(context) {
   }
   if (!diff?.trim()) {
     return vscode.window.showWarningMessage('OpenGIT: No git changes detected.');
+  }
+  // Truncate very large diffs to avoid exceeding model context windows.
+  const MAX_DIFF_CHARS = 12000;
+  if (diff.length > MAX_DIFF_CHARS) {
+    diff = diff.slice(0, MAX_DIFF_CHARS) + '\n\n[... diff truncated ...]';
   }
 
   const history = await git.getGitLog(5);
@@ -65,10 +72,44 @@ async function generateCommitMessage(context) {
   }
 }
 
+async function selectCommitModel() {
+  let cache = benchCache.data();
+  if (!cache?.results?.length) {
+    const run = await vscode.window.showInformationMessage('No benchmark cache. Run benchmark now?', 'Run Benchmark');
+    if (run === 'Run Benchmark') {
+      const ok = await benchmark.runBenchmarkWithProgress();
+      if (!ok) return;
+      cache = benchCache.data();
+    } else {
+      return;
+    }
+  }
+  const items = (cache?.results || [])
+    .filter((r) => r?.modelID)
+    .map((r) => ({
+      label: r.name || r.modelID,
+      description: `${r.providerID} · ${r.tokensPerSec ?? '?'} tok/s · TTFT ${r.ttftMs ?? '?'}ms`,
+      modelID: r.modelID,
+    }));
+  if (items.length === 0) {
+    vscode.window.showWarningMessage('No models in benchmark cache.');
+    return;
+  }
+  const pick = await vscode.window.showQuickPick(items, {
+    placeHolder: 'Select the model to use for commit message generation',
+    title: 'OpenGIT — Commit model',
+  });
+  if (!pick) return;
+  const cfg = vscode.workspace.getConfiguration('openbyok');
+  await cfg.update('commitModel', pick.modelID, vscode.ConfigurationTarget.Global);
+  vscode.window.showInformationMessage(`Commit model set to ${pick.label} (${pick.modelID}).`);
+}
+
 function register(context) {
   context.subscriptions.push(
-    vscode.commands.registerCommand('opengit.generateCommitMessage', () => generateCommitMessage(context))
+    vscode.commands.registerCommand('opengit.generateCommitMessage', () => generateCommitMessage(context)),
+    vscode.commands.registerCommand('openbyok.selectCommitModel', () => selectCommitModel()),
   );
 }
 
-module.exports = { register };
+module.exports = { register, generateCommitMessage, selectCommitModel };

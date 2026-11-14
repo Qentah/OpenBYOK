@@ -5,16 +5,26 @@ const { getJson, postJson } = require('../services/http');
 const tokenStore = require('../services/token-store');
 const benchCache = require('../services/bench-cache');
 const { CONSOLE_API, CATALOGUE_API, DEFAULT_SERVER, CLIENT_ID, BENCH_PROMPT } = require('../constants');
-const { normUrl } = require('../utils');
+const { normUrl, sleep } = require('../utils');
 
 /* ---------- Catalogue / config consolidation ---------- */
 
+let _consoleCache = { data: null, ts: 0 };
+let _catalogueCache = { data: null, ts: 0 };
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
 async function fetchConsoleConfig(token) {
-  return getJson(CONSOLE_API, { Authorization: `Bearer ${token}` });
+  if (_consoleCache.data && Date.now() - _consoleCache.ts < CACHE_TTL_MS) return _consoleCache.data;
+  const data = await getJson(CONSOLE_API, { Authorization: `Bearer ${token}` });
+  _consoleCache = { data, ts: Date.now() };
+  return data;
 }
 
 async function fetchCatalogue() {
-  return getJson(CATALOGUE_API);
+  if (_catalogueCache.data && Date.now() - _catalogueCache.ts < CACHE_TTL_MS) return _catalogueCache.data;
+  const data = await getJson(CATALOGUE_API);
+  _catalogueCache = { data, ts: Date.now() };
+  return data;
 }
 
 function indexCatalogue(cat) {
@@ -115,7 +125,6 @@ async function deviceLogin(noBrowser = false) {
     );
   }
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const deadline = Date.now() + (dc.expires_in ?? 600) * 1000;
   let interval = Math.max(dc.interval ?? 5, 1) * 1000;
   while (Date.now() < deadline) {
@@ -140,6 +149,8 @@ async function deviceLogin(noBrowser = false) {
 }
 
 async function refreshToken() {
+  _consoleCache = { data: null, ts: 0 };
+  _catalogueCache = { data: null, ts: 0 };
   await tokenStore.refreshToken();
   vscode.window.showInformationMessage('Token refreshed.');
 }

@@ -20,7 +20,7 @@ Ce document et `README.md` sont traités comme du code : leur mise à jour fait 
 
 Une modification cosmétique (typo, commentaire, log) ne déclenche **pas** cette boucle — sinon elle serait abandonnée. Le critère de déclenchement est : *un lecteur de ce document risquerait désormais d'écrire du code faux*.
 
-> Dernière vérification code : 2026-11-14 (proxy local opencode-go, session header via X-Interaction-Id).
+> Dernière vérification code : 2026-11-14 (correctifs robustesse : proxy error handling + port configurable, timeouts HTTP, bench-cache atomique, logger, ensureInputDefinition branché, reload auto, status bar, QuickPick commit model, telemetry opt-in).
 
 ---
 
@@ -88,9 +88,11 @@ Clés SecretStorage (dans `token-store.js`) : `openbyok.opencode.token`, et dér
 | `openbyok.configureApiKey` | features/byok | Guide le flux natif "Update API Key" (commandes workbench non publiques → fallback panneau Manage) |
 | `openbyok.refreshToken` | features/byok | Refresh explicite du `st_…` |
 | `openbyok.logout` | features/byok | Supprime les 4 clés SecretStorage |
+| `openbyok.removeGroup` | features/byok | Supprime un groupe BYOK de chatLanguageModels.json |
 | `openbyok.runBenchmark` | features/benchmark | Benchmark avec barre de progression, annulable, écrit le cache |
 | `openbyok.clearCache` | features/benchmark | Vide cache mémoire + fichier |
 | `opengit.generateCommitMessage` | features/opengit | Diff git → message → préremplit la SCM input box (bouton dans la barre SCM) |
+| `openbyok.selectCommitModel` | features/opengit | QuickPick pour choisir le modèle de commit (depuis le cache benchmark) |
 
 ---
 
@@ -183,10 +185,7 @@ Après écriture de `chatLanguageModels.json` : **`Developer: Reload Window`** p
 
 ---
 
-## Dettes connues (ne pas "corriger" sans le demander)
+## Dettes / points ouverts
 
-- `constants.INPUT_ID` (`'opencodeApiKey'`) : résidu de l'ancien modèle de secret, plus référencé par aucun flux.
-- `token-store.withTokenRetry()` : exporté, non utilisé par les features (`authFetch` couvre le retry 401).
-- Doublon `userSettingsPath()` : défini dans `core/utils.js` et `core/services/vscode-config.js`.
-- Coquille dans un commentaire de bandeau de `core/constants.js` (`// --- Benchmark tuning ---S`).
-- Aucun test automatisé dans le repo.
+- Aucune dette technique bloquante restante après le lot de correctifs du 2026-11-14.
+- Améliorations possibles (non bloquantes) : status bar item, commande de sélection de modèle de commit via QuickPick, i18n, telemetry opt-in. Le retry 429/5xx et le cache catalogue (TTL 5 min) sont désormais implémentés.

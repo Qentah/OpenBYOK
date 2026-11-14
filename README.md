@@ -65,6 +65,8 @@ code --install-extension openbyok-0.1.0.vsix
 |---------|--------|
 | `OpenBYOK: Refresh Token` | force a `refresh_token` round-trip |
 | `OpenBYOK: Logout` | delete the 4 SecretStorage keys |
+| `OpenBYOK: Remove a BYOK Group` | remove an `OpenBYOK …` group from `chatLanguageModels.json` |
+| `OpenBYOK: Select Commit Model` | QuickPick from benchmark cache to set the commit model |
 | `OpenBYOK: Run Benchmark (with progress)` | live benchmark, writes the cache |
 | `OpenBYOK: Clear Benchmark Cache` | wipe memory cache + JSON file |
 | `OpenGIT: Générer un message de commit` | SCM title-bar button, prefills the commit box |

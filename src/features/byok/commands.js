@@ -240,12 +240,15 @@ async function selectModels() {
   byokEntry.apiKey = apiKeyRef ?? '';
 
   vsConfig.upsertChatLanguageModel(byokEntry);
+  try { vsConfig.ensureInputDefinition(); } catch (e) { /* best effort */ }
 
-  vscode.window.showInformationMessage(
-    apiKeyRef
-      ? `Updated ${selected.length} model(s) from "${providerChoice.label}" in BYOK. Existing API key kept. Reload the window.`
-      : `Added ${selected.length} model(s) from "${providerChoice.label}" to BYOK. Open "Manage Language Models", find the group, click its gear → "Update API Key" and paste your OpenCode key — VS Code stores it natively. Then reload the window.`
-  );
+  const msg = apiKeyRef
+    ? `Updated ${selected.length} model(s) from "${providerChoice.label}" in BYOK. Existing API key kept.`
+    : `Added ${selected.length} model(s) from "${providerChoice.label}" to BYOK. Open "Manage Language Models", find the group, click its gear → "Update API Key" and paste your OpenCode key — VS Code stores it natively.`;
+  const reload = await vscode.window.showInformationMessage(msg + ' Reload the window to see the models.', 'Reload Window');
+  if (reload === 'Reload Window') {
+    await vscode.commands.executeCommand('workbench.action.reloadWindow');
+  }
 }
 
 /* ---------- configureApiKey (native prompt, no extension-side secret) ---------- */
@@ -296,6 +299,29 @@ async function configureApiKey() {
   });
 }
 
+async function removeGroup() {
+  const groups = vsConfig.readChatLanguageModels().filter(
+    (e) => String(e?.name ?? '').startsWith('OpenBYOK ')
+  );
+  if (groups.length === 0) {
+    vscode.window.showWarningMessage('No OpenBYOK group found.');
+    return;
+  }
+  const pick = await vscode.window.showQuickPick(
+    groups.map((g) => ({ label: g.name, detail: `${(g.models ?? []).length} model(s)` })),
+    { placeHolder: 'Which OpenBYOK group to remove?' }
+  );
+  if (!pick) return;
+  const all = vsConfig.readChatLanguageModels();
+  const filtered = all.filter((e) => String(e?.name ?? '') !== pick.label);
+  const clmPath = vsConfig.getChatLanguageModelsPath();
+  const fs = require('fs');
+  fs.writeFileSync(clmPath, JSON.stringify(filtered, null, 2));
+  // Remove orphaned input declarations that no longer referenced.
+  try { vsConfig.ensureInputDefinition(); } catch {}
+  vscode.window.showInformationMessage(`Removed group "${pick.label}". Reload the window to apply.`);
+}
+
 function register(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('openbyok.registerToken', () => registerToken()),
@@ -303,7 +329,9 @@ function register(context) {
     vscode.commands.registerCommand('openbyok.configureApiKey', () => configureApiKey()),
     vscode.commands.registerCommand('openbyok.refreshToken', () => refreshToken()),
     vscode.commands.registerCommand('openbyok.logout', () => logout()),
+    vscode.commands.registerCommand('openbyok.removeGroup', () => removeGroup()),
   );
 }
 
-module.exports = { register, registerToken, selectModels, configureApiKey, refreshToken, logout };
+module.exports = { register, registerToken, selectModels, configureApiKey, refreshToken, logout, removeGroup };
+

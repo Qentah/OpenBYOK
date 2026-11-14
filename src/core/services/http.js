@@ -1,41 +1,89 @@
 'use strict';
 
 const https = require('https');
+const { URL } = require('url');
 
-/** GET a URL with headers, parse JSON. Rejects on non-200 or bad JSON. */
-function getJson(url, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(url, { headers: { Accept: 'application/json', ...headers } }, (res) => {
-      let data = '';
-      res.on('data', (c) => (data += c));
-      res.on('end', () => {
-        if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode} on ${url}`));
-        try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
-      });
-    });
-    req.on('error', reject);
-    req.end();
-  });
+const DEFAULT_TIMEOUT_MS = 30000;
+
+const MAX_RETRIES = 3;
+const BASE_BACKOFF_MS = 500;
+
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+function isTransient(status) {
+  return status === 429 || status === 502 || status === 503 || status === 504;
 }
 
-/** POST JSON body, returns { status, json } (never rejects on HTTP error status). */
-function postJson(url, body, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...headers },
-    }, (res) => {
-      let data = '';
-      res.on('data', (c) => (data += c));
-      res.on('end', () => {
-        let json; try { json = JSON.parse(data); } catch { json = {}; }
-        resolve({ status: res.statusCode, json });
+/** GET a URL with headers, parse JSON. Rejects on non-200 or bad JSON or timeout. Retries on 429/5xx with backoff. */
+async function getJson(url, headers = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  let lastErr;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const u = new URL(url);
+      const res = await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: u.hostname, port: u.port || 443, path: u.pathname + u.search,
+          method: 'GET', headers: { Accept: 'application/json', ...headers },
+        }, (r) => {
+          let data = '';
+          r.on('data', (c) => (data += c));
+          r.on('end', () => resolve({ status: r.statusCode, data }));
+        });
+        req.on('error', reject);
+        req.setTimeout(timeoutMs, () => { req.destroy(new Error(`Timeout after ${timeoutMs}ms on ${url}`)); });
+        req.end();
       });
-    });
-    req.on('error', reject);
-    req.write(JSON.stringify(body));
-    req.end();
-  });
+      if (isTransient(res.status) && attempt < MAX_RETRIES) {
+        await sleep(BASE_BACKOFF_MS * Math.pow(2, attempt));
+        continue;
+      }
+      if (res.status !== 200) throw new Error(`HTTP ${res.status} on ${url}`);
+      try { return JSON.parse(res.data); } catch (e) { throw e; }
+    } catch (e) {
+      lastErr = e;
+      if (attempt < MAX_RETRIES) { await sleep(BASE_BACKOFF_MS * Math.pow(2, attempt)); continue; }
+      throw e;
+    }
+  }
+  throw lastErr;
 }
 
-module.exports = { getJson, postJson };
+async function postJson(url, body, headers = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const payload = JSON.stringify(body);
+  let lastErr;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const u = new URL(url);
+      const res = await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: u.hostname, port: u.port || 443, path: u.pathname + u.search,
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Content-Length': Buffer.byteLength(payload), ...headers },
+        }, (r) => {
+          let data = '';
+          r.on('data', (c) => (data += c));
+          r.on('end', () => {
+            let json; try { json = JSON.parse(data); } catch { json = {}; }
+            resolve({ status: r.statusCode, json, data });
+          });
+        });
+        req.on('error', reject);
+        req.setTimeout(timeoutMs, () => { req.destroy(new Error(`Timeout after ${timeoutMs}ms on ${url}`)); });
+        req.write(payload);
+        req.end();
+      });
+      if (isTransient(res.status) && attempt < MAX_RETRIES) {
+        await sleep(BASE_BACKOFF_MS * Math.pow(2, attempt));
+        continue;
+      }
+      return { status: res.status, json: res.json };
+    } catch (e) {
+      lastErr = e;
+      if (attempt < MAX_RETRIES) { await sleep(BASE_BACKOFF_MS * Math.pow(2, attempt)); continue; }
+      throw e;
+    }
+  }
+  throw lastErr;
+}
+
+module.exports = { getJson, postJson, DEFAULT_TIMEOUT_MS };

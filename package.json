@@ -7,6 +7,10 @@
   "engines": { "vscode": "^1.95.0" },
   "categories": ["Other"],
   "main": "./src/extension.js",
+  "scripts": {
+    "test": "node scripts/smoke.js",
+    "check": "node -c src/extension.js"
+  },
   "contributes": {
     "configuration": {
       "title": "OpenBYOK",
@@ -15,6 +19,30 @@
           "type": "string",
           "default": "",
           "description": "Identifiant du modèle OpenCode utilisé pour générer le message de commit (ex: poolside/laguna-xs-2.1). Laisser vide pour utiliser le premier modèle du cache de benchmark."
+        },
+        "openbyok.commitPrompt": {
+          "type": "string",
+          "default": "",
+          "description": "Prompt personnalisé pour la génération de message de commit. Utiliser {history} pour l'historique récent. Laisser vide pour le prompt par défaut."
+        },
+        "openbyok.proxyPort": {
+          "type": "number",
+          "default": 18080,
+          "description": "Port local du proxy OpenCode Go (session header injection)."
+        },
+        "openbyok.benchTimeoutMs": {
+          "type": "number",
+          "default": 15000,
+          "description": "Timeout (ms) par modèle lors du benchmark."
+        },
+        "openbyok.benchConcurrency": {
+          "type": "number",
+          "default": 8,
+          "description": "Concurrence du benchmark (nombre de modèles testés en parallèle)."        },
+        "openbyok.telemetryEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt-in: enable anonymized usage telemetry (default off)."
         }
       }
     },
@@ -24,9 +52,11 @@
       { "command": "openbyok.configureApiKey", "title": "OpenBYOK: Configure Group API Key (native)" },
       { "command": "openbyok.refreshToken", "title": "OpenBYOK: Refresh Token" },
       { "command": "openbyok.logout", "title": "OpenBYOK: Logout" },
+      { "command": "openbyok.removeGroup", "title": "OpenBYOK: Remove a BYOK Group" },
       { "command": "openbyok.runBenchmark", "title": "OpenBYOK: Run Benchmark (with progress)" },
       { "command": "openbyok.clearCache", "title": "OpenBYOK: Clear Benchmark Cache" },
-      { "command": "opengit.generateCommitMessage", "title": "OpenGIT: Générer un message de commit", "icon": "$(git-commit)" }
+      { "command": "opengit.generateCommitMessage", "title": "OpenGIT: Générer un message de commit", "icon": "$(git-commit)" },
+      { "command": "openbyok.selectCommitModel", "title": "OpenBYOK: Select Commit Model" }
     ],
     "languageModelChatProviders": [
       {

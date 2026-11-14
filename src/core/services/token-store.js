@@ -1,6 +1,6 @@
 'use strict';
 
-const https = require('https');
+const { postJson } = require('./http');
 const { SECRET_KEY, DEFAULT_SERVER, CLIENT_ID } = require('../constants');
 
 // SecretStorage keys — VS Code SecretStorage is the single source of truth
@@ -15,26 +15,6 @@ async function init(secrets) {
   secretStorage = secrets;
 }
 
-function postJson(url, body) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    }, (res) => {
-      let data = '';
-      res.on('data', (c) => (data += c));
-      res.on('end', () => {
-        let json; try { json = JSON.parse(data); } catch { json = {}; }
-        resolve({ status: res.statusCode, json });
-      });
-    });
-    req.on('error', reject);
-    req.write(JSON.stringify(body));
-    req.end();
-  });
-}
-
-/** Refresh the access token using the stored refresh_token. Throws on failure. */
 async function refreshToken() {
   const refresh = await secretStorage.get(KEY_REFRESH);
   if (!refresh) throw new Error('No refresh token. Re-register.');

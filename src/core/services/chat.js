@@ -14,10 +14,13 @@ function sessionId() {
  * Non-streaming chat completion. Returns the assistant text.
  * Throws with a truncated response body on HTTP error.
  */
-async function chatCompletion(baseURL, modelID, token, prompt) {
+async function chatCompletion(baseURL, modelID, token, prompt, timeoutMs = 60000) {
   const url = `${normUrl(baseURL)}/chat/completions`;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
   const init = {
     method: 'POST',
+    signal: ac.signal,
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
@@ -29,13 +32,17 @@ async function chatCompletion(baseURL, modelID, token, prompt) {
       stream: false,
     }),
   };
-  const res = await tokenStore.authFetch(url, init);
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`HTTP ${res.status} — ${text.slice(0, 200)}`);
+  try {
+    const res = await tokenStore.authFetch(url, init);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status} — ${text.slice(0, 200)}`);
+    }
+    const json = await res.json();
+    return (json.choices?.[0]?.message?.content ?? '').trim();
+  } finally {
+    clearTimeout(timer);
   }
-  const json = await res.json();
-  return (json.choices?.[0]?.message?.content ?? '').trim();
 }
 
 /**

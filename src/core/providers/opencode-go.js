@@ -3,8 +3,9 @@
 const { getJson } = require('../services/http');
 const tokenStore = require('../services/token-store');
 
+const proxy = require('../services/proxy');
 const GO_MODELS_URL = 'https://opencode.ai/inference/go/v1/models';
-const GO_BASE_URL = 'http://127.0.0.1:18080';
+function goBaseUrl() { return `http://127.0.0.1:${proxy.proxyPort()}`; }
 
 async function listModels() {
   const token = await tokenStore.getToken();
@@ -39,7 +40,7 @@ async function listModels() {
       contextWindow,
       maxInputTokens: maxInput,
       maxOutputTokens: maxOutput,
-      baseURL: GO_BASE_URL,
+      baseURL: goBaseUrl(),
       prompt: 'Réponds en une phrase courte : qu\'est-ce que la gravité ?',
     });
   }
@@ -48,7 +49,9 @@ async function listModels() {
 
 async function findModelById(token, id) {
   const models = await listModels();
-  return models.find((m) => m.modelID === id || m.key === id) ?? null;
+  const found = models.find((m) => m.modelID === id || m.key === id);
+  if (!found) throw new Error(`Model "${id}" not found.`);
+  return found;
 }
 
 module.exports = {
