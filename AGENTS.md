@@ -2,7 +2,7 @@
 
 ## Rôle de cet agent
 
-Tu es l'expert dédié à l'extension VS Code **openbyok** (dossier `vscode/`) : son code modulaire (`src/`), ses 8 commandes, les fichiers de configuration VS Code qu'elle écrit, et ses dépendances externes (zéro dépendance npm, CommonJS pur, aucun build).
+Tu es l'expert dédié à l'extension VS Code **openbyok** (dossier `vscode/`) : son code modulaire (`src/`), ses 11 commandes, les fichiers de configuration VS Code qu'elle écrit, et ses dépendances externes (zéro dépendance npm, CommonJS pur, aucun build).
 
 Agis comme si tu l'avais écrite toi-même. **Le code est la source de vérité, ce document n'en est que le reflet.** Ne cite jamais un fait de ce fichier sans l'avoir confirmé dans `src/` : si les deux divergent, c'est le fichier qui est faux.
 
@@ -20,7 +20,7 @@ Ce document et `README.md` sont traités comme du code : leur mise à jour fait 
 
 Une modification cosmétique (typo, commentaire, log) ne déclenche **pas** cette boucle — sinon elle serait abandonnée. Le critère de déclenchement est : *un lecteur de ce document risquerait désormais d'écrire du code faux*.
 
-> Dernière vérification code : 2026-11-14 (correctifs robustesse : proxy error handling + port configurable, timeouts HTTP, bench-cache atomique, logger, ensureInputDefinition branché, reload auto, status bar, QuickPick commit model, telemetry opt-in).
+> Dernière vérification code : 2026-11-14 (alignement docs sur le code : 11 commandes, proxy/logger/telemetry/services, registry multi-provider, bench configurable, reload auto, status bar, QuickPick commit/benchmark).
 
 ---
 
@@ -28,38 +28,42 @@ Une modification cosmétique (typo, commentaire, log) ne déclenche **pas** cett
 
 ```
 vscode/
-├── package.json          # Manifest : 8 commandes, engines ^1.95, 0 dépendance npm
+├── package.json          # Manifest : 11 commandes, contributes.configuration, engines ^1.95, 0 dépendance npm
 ├── .vscodeignore
 └── src/
-    ├── extension.js      # POINT D'ENTRÉE = wiring seul (~35 lignes), AUCUNE logique ici
+    ├── extension.js      # POINT D'ENTRÉE = wiring : logger/proxy/token-store/cache, status bar, auto-bench si expiré, register()
     ├── core/
-    │   ├── constants.js            # toutes les constantes
-    │   ├── utils.js                # sleep, runPool(items, worker, limit), normUrl, userSettingsPath
+    │   ├── constants.js            # endpoints, clés, tuning benchmark/cache
+    │   ├── utils.js                # sleep, runPool, normUrl, userSettingsPath
     │   ├── providers/
-    │   │   ├── opencode.js         # provider OpenCode Console (catalogue, device flow, résolution)
-    │   │   ├── opencode-cli.js     # complément CLI local (optionnel, activé si binaire détecté)
+    │   │   ├── opencode.js         # provider OpenCode Console (catalogue+config, device flow, résolution)
+    │   │   ├── opencode-cli.js     # complément CLI local (opencode auth export, optionnel)
+    │   │   ├── opencode-go.js      # provider OpenCode Go (modèles via endpoint inference, via proxy local)
     │   │   └── registry.js         # Map de providers — interface commune
     │   └── services/
-    │       ├── token-store.js      # SecretStorage + refresh + authFetch (enveloppe réseau)
-    │       ├── bench-cache.js      # cache JSON fichier (TTL)
-    │       ├── http.js             # getJson / postJson uniquement (https brut)
+    │       ├── token-store.js      # SecretStorage + refresh + authFetch (retry 401)
+    │       ├── bench-cache.js      # cache JSON fichier (TTL, écriture atomique)
+    │       ├── http.js             # getJson / postJson (https brut, timeout, retry transitoire)
     │       ├── chat.js             # chatCompletion + chatCompletionStream (SSE)
     │       ├── proc.js             # execFile wrapper
-    │       ├── git.js              # getGitDiff + fillScmInputBox (JAMAIS de commit direct)
-    │       └── vscode-config.js    # chatLanguageModels.json (+ ensureInputDefinition)
+    │       ├── git.js              # getGitDiff/getGitLog + fillScmInputBox (JAMAIS de commit direct)
+    │       ├── vscode-config.js    # chatLanguageModels.json + settings.json inputs
+    │       ├── proxy.js            # proxy HTTP local 127.0.0.1 (session header) pour OpenCode Go
+    │       ├── logger.js           # OutputChannel "OpenBYOK"
+    │       └── telemetry.js        # module présent (opt-in via config, usage limité)
     └── features/
-        ├── byok/commands.js        # registerToken, selectModels, configureApiKey, refreshToken, logout
-        ├── benchmark/{benchmark,commands}.js
-        └── opengit/command.js      # génération de message de commit
+        ├── byok/commands.js        # registerToken, selectModels, configureApiKey, refreshToken, logout, removeGroup
+        ├── benchmark/{benchmark,commands}.js  # benchmark, cache, status bar, sélection modèle
+        └── opengit/command.js      # génération de message de commit + sélection modèle commit
 ```
 
 Règles d'architecture (à respecter dans toute modification) :
-- `extension.js` ne contient que `activate()`/`deactivate()` : init services + `feature.register(context)`.
+- `extension.js` ne contient que le wiring `activate()`/`deactivate()` (init services/proxy/status bar + `feature.register(context)`), pas de logique métier.
 - Chaque feature expose `register(context)` ; les chemins `require` depuis `features/*` sont `../../core/...` (2 niveaux).
-- Le core ne parle aux fournisseurs que via `registry` (interface : `listModels`, `findModelById`, `deviceLogin`, `refreshToken`, `resolveModelFor`, `cliExportToken`/`cliAvailable` optionnels). Ajouter un provider = un module + une entrée dans `registry.js`.
+- Le core ne parle aux fournisseurs que via `registry` (interface : `listModels`, `findModelById`, `deviceLogin`/`refreshToken`/`resolveModelFor`/`cliExportToken`/`cliAvailable` optionnels). Ajouter un provider = un module + une entrée dans `registry.js`.
 - `http.js` = REST générique ; `chat.js` = chat completions. Ne pas remélanger.
 - Git : **préremplir uniquement la SCM input box** (`fillScmInputBox`), jamais `git commit` direct.
-- Benchmark en arrière-plan : déclenché **uniquement à l'activation si le cache est expiré**, jamais par intervalle/timer périodique.
+- Benchmark : auto-déclenché à l'activation **si token disponible et cache expiré** (flag anti-rentrée), jamais par timer périodique. Le benchmark interactif/manuel peut cibler un provider ou tous.
 
 ---
 
@@ -79,19 +83,20 @@ Clés SecretStorage (dans `token-store.js`) : `openbyok.opencode.token`, et dér
 
 ---
 
-## Les 8 commandes VS Code
+## Les 11 commandes VS Code
 
 | Commande | Fichier | Rôle |
 |----------|---------|------|
-| `openbyok.registerToken` | features/byok | Device flow (browser ou URL manuelle) ; option CLI proposée **seulement si** `opencode` détecté |
-| `openbyok.selectModels` | features/byok | 2 étapes : choix du **provider** puis sélection des modèles (statuts OK/SLOW/…) |
-| `openbyok.configureApiKey` | features/byok | Guide le flux natif "Update API Key" (commandes workbench non publiques → fallback panneau Manage) |
+| `openbyok.registerToken` | features/byok | Device flow (browser ou URL manuelle) ; option CLI proposée **seulement si** `opencode` CLI détecté |
+| `openbyok.selectModels` | features/byok | 2 étapes : choix du **provider** puis sélection des modèles (statuts bench/cache), écrit le groupe BYOK |
+| `openbyok.configureApiKey` | features/byok | Guide le flux natif "Update API Key" (commandes workbench si dispo, sinon panneau Manage) |
 | `openbyok.refreshToken` | features/byok | Refresh explicite du `st_…` |
 | `openbyok.logout` | features/byok | Supprime les 4 clés SecretStorage |
-| `openbyok.removeGroup` | features/byok | Supprime un groupe BYOK de chatLanguageModels.json |
-| `openbyok.runBenchmark` | features/benchmark | Benchmark avec barre de progression, annulable, écrit le cache |
-| `openbyok.clearCache` | features/benchmark | Vide cache mémoire + fichier |
-| `openbyok.selectFromBenchmark` | features/benchmark | Status-bar click : benchmark global + sélection auto/modèle |
+| `openbyok.removeGroup` | features/byok | Supprime un groupe `OpenBYOK …` de `chatLanguageModels.json` |
+| `openbyok.runBenchmark` | features/benchmark | Benchmark avec progression (choix provider/tous), annulable, écrit le cache |
+| `openbyok.clearCache` | features/benchmark | Vide cache mémoire + fichier et met à jour la status bar |
+| `openbyok.selectFromBenchmark` | features/benchmark | Clic status bar : QuickPick global (Auto/plus rapide ou modèle) → met à jour `openbyok.commitModel` |
+| `openbyok.generateCommitMessage` | features/opengit | Génère un message de commit (diff git) et préremplit la SCM input box |
 | `openbyok.selectCommitModel` | features/opengit | QuickPick pour choisir le modèle de commit (depuis le cache benchmark) |
 
 ---
@@ -110,7 +115,7 @@ C'est le point qui a coûté le plus de corrections en session. À appliquer str
    - re-sélection d'un groupe existant → **conserver** son `${input:...}` actuel ;
    - nouveau groupe → écrire `apiKey: ""` (placeholder vide **obligatoire** : sans champ `apiKey`, VS Code n'affiche pas le groupe et le flux "Update API Key" est inatteignable). L'utilisateur saisit la clé → VS Code crée son propre id et réécrit le fichier.
 6. **Ne jamais toucher au groupe `OpenCode Go`** (vendor `opencodego`, fourni par l'extension tierce `ltmoerdani.opencode-copilot-chat`, pleinement fonctionnel). Nos écritures sont filtrées par `name` uniquement — vérifier avant tout nettoyage.
-7. `ensureInputDefinition()` (dans `vscode-config.js`) répare les `${input:X}` manquants dans `settings.json`. Il est **exporté mais non appelé** par les flux courants : ne le branche pas sans raison, et ne le supprime pas (utilisé en dépannage manuel).
+7. `ensureInputDefinition()` (dans `vscode-config.js`) répare les `${input:X}` manquants dans `settings.json`. Il est appelé en best-effort après `selectModels()` (après écriture `chatLanguageModels.json`) et après `removeGroup()` pour nettoyer les entrées orphelines. Ne pas le supprimer (utile aussi en dépannage).
 
 ### Erreurs fréquentes à ne pas reproduire
 
@@ -137,24 +142,26 @@ C'est le point qui a coûté le plus de corrections en session. À appliquer str
 
 ## Système de benchmark & cache
 
-Seuils (dans `benchmarkModel`, `core/constants.js`) :
+Seuils (`features/benchmark/benchmark.js`, constantes dans `core/constants.js`) :
 
 | Statut | Condition |
 |--------|-----------|
 | ✅ OK | répondu, ttft ≤ 5 s, tokens/s ≥ 5 |
 | 🐌 SLOW | ttft > 5 s **ou** tokens/s < 5 |
-| ⏱️ TIMEOUT | `AbortController` (15 s) |
+| ⏱️ TIMEOUT | timeout (AbortController, défaut 15 s) |
 | ❌ ERROR | HTTP / parse / réseau |
 | ⚠️ NO_TOKENS | HTTP 200 mais aucun delta `content` |
 | ❓ UNKNOWN | pas encore benchmarké |
 
-Paramètres : timeout **15 s**, concurrence **8**, prompt test `"Réponds en une phrase courte : qu'est-ce que la gravité ?"`, endpoint `{baseURL}/chat/completions` en streaming SSE.
+Paramètres par défaut (`constants.js`) : timeout **15 s**, concurrence **8**, cache TTL **2 h** (`CACHE_MAX_AGE_MS`), prompt test `"Réponds en une phrase courte : qu'est-ce que la gravité ?"`, endpoint `{baseURL}/chat/completions` en streaming SSE.  
+Surcharges utilisateur (`openbyok.benchTimeoutMs`, `openbyok.benchConcurrency`) lues dans `features/benchmark/commands.js`.
 
-Cache `~\.openbyok-benchmark-cache.json` : TTL **2 h** (`CACHE_MAX_AGE_MS = 2 * 60 * 60 * 1000`).
-- `activate()` → `runBackgroundBenchmark()` silencieux si cache non frais (flag `running` anti-rentrée).
+Cache `~\.openbyok-benchmark-cache.json` : `{timestamp, results[]}`, écriture atomique (`.tmp` + rename) dans `bench-cache.js`.
+- `activate()` → benchmark arrière-plan silencieux **si token présent et cache expiré** (flag `running` anti-rentrée), puis mise à jour de la status bar.
 - `selectModels()` → cache frais : affichage immédiat ; sinon propose *Run Benchmark* (progression) ou *Skip (show all)*.
-- Tri d'affichage : OK → SLOW → UNKNOWN → NO_TOKENS → TIMEOUT → ERROR, puis tokens/s décroissant.
-- `fastestModel()` (tri tokens/s desc, puis ttft asc) sert de fallback à `resolveModelFor()` pour OpenGIT ; dans ce cas un message affiche clairement le fallback.
+- Benchmark manuel/progress : choix du provider à tester (`All providers` ou un provider du registry). Les modèles `opencode-go` non `-free` sont exclus du bench.
+- Tri d'affichage (selectModels) : par `spd` (sec/1k tokens, issu de la latence simple) puis statut OK→SLOW→UNKNOWN→NO_TOKENS→TIMEOUT→ERROR, puis clé. `selectFromBenchmark` trie par `spd` asc.
+- `fastestModel()` (cache) trie par `spd` asc puis `ttftMs` asc ; sert de fallback à `resolveModelFor()` (OpenGIT). Si aucun `openbyok.commitModel` configuré, OpenGIT affiche un message de fallback explicite.
 
 ---
 
@@ -185,7 +192,16 @@ Après écriture de `chatLanguageModels.json` : **`Developer: Reload Window`** p
 
 ---
 
+## Proxy OpenCode Go, logging, telemetry, config
+
+- `core/services/proxy.js` : proxy HTTP local (`127.0.0.1`, port `openbyok.proxyPort`, défaut **18080**) vers `https://opencode.ai/inference/go/openai/v1...`, injecte `x-opencode-session`, supprime `messages[].reasoning` des requêtes JSON, propage les erreurs upstream (`502`). Démarré à l'activation, arrêté à la désactivation. Utilisé par le provider `opencode-go` (`baseURL` local).
+- `core/services/logger.js` : OutputChannel `OpenBYOK` (init à l'activation). Logs utilisés par proxy/benchmark/features ; l'appel télémetrie éventuel via `vscode.telemetry.sendEvent` est conditionné à `openbyok.telemetryEnabled` (best-effort, peut être ignoré selon runtime).
+- `core/services/telemetry.js` : module présent avec helper `isEnabled()`/events ; **non branché** dans les flux actuels. Rester cohérent si on l'active réellement.
+- Configuration contribuée (`package.json` contributes.configuration) : `openbyok.commitModel`, `openbyok.commitPrompt` (`{history}`), `openbyok.proxyPort`, `openbyok.benchTimeoutMs`, `openbyok.benchConcurrency`, `openbyok.telemetryEnabled` (default `false`).
+
 ## Dettes / points ouverts
 
-- Aucune dette technique bloquante restante après le lot de correctifs du 2026-11-14.
-- Améliorations possibles (non bloquantes) : status bar item, commande de sélection de modèle de commit via QuickPick, i18n, telemetry opt-in. Le retry 429/5xx et le cache catalogue (TTL 5 min) sont désormais implémentés.
+- `core/services/telemetry.js` existe mais n'est pas utilisé (le logger contient un hook télémetrie best-effort séparé) → clarifier/unifier si la télémétrie devient une vraie feature.
+- `tokenStore.withTokenRetry` est exporté mais peu/pas utilisé ; `authFetch()` couvre le retry 401 réseau. Évaluer avant suppression.
+- `package.json` déclare encore `languageModelChatProviders` (vendor `openbyok`) : entrée **inerte** pour notre flux BYOK (`customendpoint`) — garder ou retirer en connaissance de cause.
+- Tests automatisés en-dehors de `src/` (`scripts/smoke.js` déclaré) → hors périmètre de cette analyse `src/`, mais à vérifier si besoin.

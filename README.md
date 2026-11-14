@@ -8,13 +8,15 @@ Pure CommonJS, **zero npm dependencies**, no build step. Modular layout:
 and `src/features/` (byok, benchmark, opengit).
 
 ## Features
-- Register an OpenCode Console token (`st_…`) via device flow (browser or manual URL), or auto-retrieve from the OpenCode CLI when it is detected on the machine
+- Register an OpenCode Console token (`st_…`) via device flow (browser or manual URL), or auto-retrieve from the OpenCode CLI when detected
+- **Multi-provider registry**: OpenCode Console and OpenCode Go (OpenCode Go served via a local proxy for session header injection)
 - Two-step model picker: choose a **provider**, then its models (statused OK / SLOW / TIMEOUT / ERROR / NO_TOKENS / UNKNOWN from the benchmark cache)
 - **Consolidated metadata**: context window, output limits, vision, tool calling, reasoning effort — merged from the Console API and the static catalogue
 - Auto-generates `chatLanguageModels.json` groups named `OpenBYOK <provider>` (vendor `customendpoint`, apiType `chat-completions`)
 - Console token stored in VS Code SecretStorage (encrypted, OS-level) with automatic refresh + retry-on-401 network wrapper (`authFetch`)
-- Background benchmark cache (`~/.openbyok-benchmark-cache.json`, TTL 2 h) refreshed only when expired, plus a cancellable progress command
-- `OpenBYOK`: generates a conventional commit message from the git diff and prefills the Source Control input box (never commits directly)
+- Background benchmark cache (`~/.openbyok-benchmark-cache.json`, TTL 2 h) refreshed only when expired (and token available), cancellable progress command, status bar item, configurable timeout/concurrency
+- Commit message generation: generates a conventional commit message from the git diff and prefills the Source Control input box (never commits directly); commit model selectable (Auto/fastest or chosen from benchmark cache)
+- OutputChannel `OpenBYOK` logging; local proxy for OpenCode Go (configurable port)
 
 ## Installation (from source — no compilation needed)
 
@@ -35,7 +37,7 @@ You can install it directly from the source folder and modify the code on the fl
 New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.vscode\extensions\openbyok" -Target "REDACTED_LOCAL_PATH"
 ```
 
-Then reload VS Code. Any edit to `src/extension.js` takes effect after a window reload.
+Then reload VS Code. Any edit under `src/` takes effect after a window reload.
 
 ### Option C — Package as .vsix (no compile)
 
@@ -63,13 +65,15 @@ code --install-extension openbyok-0.1.0.vsix
 ### Other commands
 | Command | Effect |
 |---------|--------|
+| `OpenBYOK: Configure Group API Key (native)` | guide native "Update API Key" flow for an OpenBYOK group |
 | `OpenBYOK: Refresh Token` | force a `refresh_token` round-trip |
 | `OpenBYOK: Logout` | delete the 4 SecretStorage keys |
 | `OpenBYOK: Remove a BYOK Group` | remove an `OpenBYOK …` group from `chatLanguageModels.json` |
-| `OpenBYOK: Select Model from Benchmark` | status-bar click → global benchmark QuickPick, choose Auto or a model |
-| `OpenBYOK: Run Benchmark (with progress)` | live benchmark, writes the cache |
-| `OpenBYOK: Clear Benchmark Cache` | wipe memory cache + JSON file |
-| `OpenBYOK: Générer un message de commit` | SCM title-bar button, prefills the commit box |
+| `OpenBYOK: Run Benchmark (with progress)` | live benchmark (choose provider/all), writes the cache |
+| `OpenBYOK: Clear Benchmark Cache` | wipe memory cache + JSON file and refresh status bar |
+| `OpenBYOK: Select Model from Benchmark` | status-bar click → global benchmark QuickPick, choose Auto or a model (sets `openbyok.commitModel`) |
+| `OpenBYOK: Select Commit Model` | choose commit-generation model from the benchmark cache |
+| `OpenBYOK: Générer un message de commit` | SCM title-bar button, prefills the commit box (never commits directly) |
 
 ## Credentials model (important)
 Two different secrets are involved and must not be mixed up:
@@ -101,7 +105,13 @@ the same model ID (matching the console OpenCode display values).
 
 ## Benchmark tuning
 Defaults in `src/core/constants.js`: per-model timeout 15 s, concurrency 8,
-cache TTL 2 h, SLOW thresholds TTFT > 5 s or < 5 tokens/s.
+cache TTL 2 h, SLOW thresholds TTFT > 5 s or < 5 tokens/s. Timeout and
+concurrency can be overridden via `openbyok.benchTimeoutMs` / `openbyok.benchConcurrency`.
+
+## Proxy (OpenCode Go)
+A local HTTP proxy (`127.0.0.1:<openbyok.proxyPort>`, default 18080) is started on
+activation to serve OpenCode Go models (session header injection / request shaping). It is
+stopped on deactivation. Logs are written to the **OpenBYOK** OutputChannel.
 
 See `AGENTS.md` for the maintainer-oriented reference (architecture rules,
 credential pitfalls, known debts).
