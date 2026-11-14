@@ -27,17 +27,29 @@ function start() {
   server = http.createServer((req, res) => {
     const targetUrl = new URL(`https://${TARGET_HOST}${TARGET_PATH_PREFIX}${req.url}`);
     const sessionId = getSessionId(req);
-    const headers = { ...req.headers, host: TARGET_HOST, 'x-opencode-session': sessionId };
-    delete headers['content-length'];
-    const proxyReq = https.request(targetUrl, { method: req.method, headers }, (proxyRes) => {
-      res.writeHead(proxyRes.statusCode, proxyRes.headers);
-      proxyRes.pipe(res);
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      let body = Buffer.concat(chunks);
+      try {
+        const json = JSON.parse(body.toString());
+        if (Array.isArray(json.messages)) {
+          for (const m of json.messages) delete m.reasoning;
+        }
+        body = Buffer.from(JSON.stringify(json));
+      } catch { /* not JSON, pass through */ }
+      const headers = { ...req.headers, host: TARGET_HOST, 'x-opencode-session': sessionId, 'content-length': body.length };
+      const proxyReq = https.request(targetUrl, { method: req.method, headers }, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res);
+      });
+      proxyReq.on('error', (e) => {
+        res.writeHead(502);
+        res.end(JSON.stringify({ error: e.message }));
+      });
+      proxyReq.write(body);
+      proxyReq.end();
     });
-    proxyReq.on('error', (e) => {
-      res.writeHead(502);
-      res.end(JSON.stringify({ error: e.message }));
-    });
-    req.pipe(proxyReq);
   });
   server.listen(PROXY_PORT, '127.0.0.1');
 }
