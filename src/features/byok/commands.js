@@ -170,12 +170,12 @@ async function selectModels() {
   });
 
   benchResults.sort((a, b) => {
-    const sa = statusOrder[a.bench.status] ?? 6;
-    const sb = statusOrder[b.bench.status] ?? 6;
-    if (sa !== sb) return sa - sb;
     const spa = a.bench.spd ?? Infinity;
     const spb = b.bench.spd ?? Infinity;
     if (spa !== spb) return spa - spb;
+    const sa = statusOrder[a.bench.status] ?? 6;
+    const sb = statusOrder[b.bench.status] ?? 6;
+    if (sa !== sb) return sa - sb;
     return a.model.key.localeCompare(b.model.key);
   });
 
