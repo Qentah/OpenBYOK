@@ -21,11 +21,30 @@
     "commands": [
       { "command": "openbyok.registerToken", "title": "OpenBYOK: Register API Token (st_…)" },
       { "command": "openbyok.selectModels", "title": "OpenBYOK: Select Models for BYOK" },
+      { "command": "openbyok.configureApiKey", "title": "OpenBYOK: Configure Group API Key (native)" },
       { "command": "openbyok.refreshToken", "title": "OpenBYOK: Refresh Token" },
       { "command": "openbyok.logout", "title": "OpenBYOK: Logout" },
       { "command": "openbyok.runBenchmark", "title": "OpenBYOK: Run Benchmark (with progress)" },
       { "command": "openbyok.clearCache", "title": "OpenBYOK: Clear Benchmark Cache" },
       { "command": "opengit.generateCommitMessage", "title": "OpenGIT: Générer un message de commit", "icon": "$(git-commit)" }
+    ],
+    "languageModelChatProviders": [
+      {
+        "vendor": "openbyok",
+        "displayName": "OpenBYOK",
+        "configuration": {
+          "type": "object",
+          "required": ["apiKey"],
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "title": "OpenBYOK API Key",
+              "description": "Enter your OpenCode key (oc_sk_…). Stored natively by VS Code.",
+              "secret": true
+            }
+          }
+        }
+      }
     ],
     "menus": {
       "scm/title": [

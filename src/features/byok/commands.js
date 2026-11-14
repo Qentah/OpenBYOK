@@ -20,10 +20,13 @@ const benchmark = require('../benchmark/commands');
  * Correct-by-the-spec behaviour:
  *   - Re-selecting an existing group keeps its current `${input:...}` so the
  *     already-stored secret survives.
- *   - A brand-new group is written WITHOUT any apiKey. VS Code then shows the
- *     group in Manage Language Models and prompts the user to set the key once;
- *     it stores the value natively and rewrites chatLanguageModels.json with
- *     its own `${input:chat.lm.secret.X}` id. No extension-side secret sync.
+ *   - A brand-new group is written with an EMPTY apiKey placeholder. VS Code
+ *     only lists a group in Manage Language Models when an apiKey field is
+ *     present; without it the "Update API Key" flow can never be reached. The
+ *     empty value makes the group appear, and once the user sets the key VS
+ *     Code generates its own chat.lm.secret.X id, stores the value natively,
+ *     and rewrites chatLanguageModels.json with that reference. No
+ *     extension-side secret sync, no invented ids.
  */
 function resolveByokApiKey(existingEntry) {
   const m = typeof existingEntry?.apiKey === 'string'
@@ -224,27 +227,76 @@ async function selectModels() {
   };
 
   // Preserve an existing native credential reference so a stored secret
-  // survives re-selection. A brand-new group is written without apiKey: VS
-  // Code owns the id and stores the value when the user sets the key in
-  // Manage Language Models (it then rewrites this file with its own id).
-  if (apiKeyRef) byokEntry.apiKey = apiKeyRef;
+  // survives re-selection. A brand-new group gets an EMPTY apiKey placeholder
+  // so VS Code lists it in Manage Language Models and the user can set the key
+  // (VS Code then replaces this with its own ${input:chat.lm.secret.X} id).
+  byokEntry.apiKey = apiKeyRef ?? '';
 
   vsConfig.upsertChatLanguageModel(byokEntry);
 
   vscode.window.showInformationMessage(
     apiKeyRef
       ? `Updated ${selected.length} model(s) from "${providerChoice.label}" in BYOK. Existing API key kept. Reload the window.`
-      : `Added ${selected.length} model(s) from "${providerChoice.label}" to BYOK. Open "Manage Language Models", click the group's gear → "Update API Key" and paste your OpenCode key — VS Code stores it natively. Then reload the window.`
+      : `Added ${selected.length} model(s) from "${providerChoice.label}" to BYOK. Open "Manage Language Models", find the group, click its gear → "Update API Key" and paste your OpenCode key — VS Code stores it natively. Then reload the window.`
   );
+}
+
+/* ---------- configureApiKey (native prompt, no extension-side secret) ---------- */
+
+/**
+ * Guide VS Code's native "Update API Key" flow for one of our BYOK groups.
+ * Our groups use the core-known vendor `customendpoint`, which Copilot Chat
+ * serves directly from chatLanguageModels.json. The workbench credential
+ * methods are not public commands, so we open Manage Language Models and let
+ * the user trigger "Update API Key": VS Code then generates its own
+ * chat.lm.secret.X id, stores the value natively, and rewrites the file.
+ * We never invent ids.
+ */
+async function configureApiKey() {
+  const groups = vsConfig.readChatLanguageModels().filter(
+    (e) => String(e?.name ?? '').startsWith('OpenBYOK ')
+      && ['customendpoint', 'openbyok'].includes(String(e?.vendor ?? ''))
+  );
+  if (groups.length === 0) {
+    vscode.window.showWarningMessage('No OpenBYOK group found. Run "OpenBYOK: Select Models for BYOK" first.');
+    return;
+  }
+  const pick = groups.length === 1
+    ? groups[0]
+    : await vscode.window.showQuickPick(
+        groups.map((g) => ({ label: g.name, detail: `${(g.models ?? []).length} model(s)` })),
+        { placeHolder: 'Which OpenBYOK group needs its API key?' }
+      );
+  if (!pick) return;
+  const entry = pick.name ? pick : groups.find((g) => g.name === pick.label);
+  const name = entry?.name ?? pick.label;
+  const vendor = String(entry?.vendor ?? 'customendpoint');
+
+  // Try to drive the native prompt directly; fall back to opening Manage panel.
+  try {
+    await vscode.commands.executeCommand('vscode.updateLanguageModelsProviderGroupApiKey', vendor, name);
+    return;
+  } catch { /* command not exposed — use the generic configure entry point */ }
+  try {
+    await vscode.commands.executeCommand('vscode.configureLanguageModelsProviderGroup', vendor, name);
+    return;
+  } catch { /* fall through to guidance */ }
+  vscode.window.showInformationMessage(
+    `Open "Manage Language Models", find "${name}", click the gear → "Update API Key", and paste your OpenCode key.`,
+    'Open Manage Language Models'
+  ).then((choice) => {
+    if (choice) vscode.commands.executeCommand('workbench.action.chat.manageLanguageModels');
+  });
 }
 
 function register(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('openbyok.registerToken', () => registerToken()),
     vscode.commands.registerCommand('openbyok.selectModels', () => selectModels()),
+    vscode.commands.registerCommand('openbyok.configureApiKey', () => configureApiKey()),
     vscode.commands.registerCommand('openbyok.refreshToken', () => refreshToken()),
     vscode.commands.registerCommand('openbyok.logout', () => logout()),
   );
 }
 
-module.exports = { register, registerToken, selectModels, refreshToken, logout };
+module.exports = { register, registerToken, selectModels, configureApiKey, refreshToken, logout };
