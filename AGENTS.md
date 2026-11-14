@@ -20,7 +20,7 @@ Ce document et `README.md` sont traités comme du code : leur mise à jour fait 
 
 Une modification cosmétique (typo, commentaire, log) ne déclenche **pas** cette boucle — sinon elle serait abandonnée. Le critère de déclenchement est : *un lecteur de ce document risquerait désormais d'écrire du code faux*.
 
-> Dernière vérification code : 2026-11-14 (structure modulaire `src/`, 8 commandes, modèle de credentials natif VS Code, cache TTL 2 h).
+> Dernière vérification code : 2026-11-14 (proxy local opencode-go, session header via X-Interaction-Id).
 
 ---
 
