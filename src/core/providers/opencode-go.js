@@ -4,7 +4,7 @@ const { getJson } = require('../services/http');
 const tokenStore = require('../services/token-store');
 
 const GO_MODELS_URL = 'https://opencode.ai/inference/go/v1/models';
-const GO_BASE_URL = 'https://opencode.ai/inference/go/openai/v1';
+const GO_BASE_URL = 'http://127.0.0.1:18080';
 
 async function listModels() {
   const token = await tokenStore.getToken();

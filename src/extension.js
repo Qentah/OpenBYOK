@@ -8,13 +8,15 @@
 
 const tokenStore = require('./core/services/token-store');
 const benchCache = require('./core/services/bench-cache');
+const proxy = require('./core/services/proxy');
 
 const byok = require('./features/byok/commands');
 const benchmark = require('./features/benchmark/commands');
 const opengit = require('./features/opengit/command');
 
-async function activate(context) {
-  await tokenStore.init(context.secrets);
+function activate(context) {
+  proxy.start();
+  tokenStore.init(context.secrets);
   benchCache.load();
 
   // Auto-refresh benchmark cache in background only when it has expired (silent).
