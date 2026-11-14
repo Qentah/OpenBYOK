@@ -90,11 +90,18 @@ async function logout() {
 /* ---------- selectModels ---------- */
 
 async function selectModels() {
-  let models;
+  let models = [];
   let token;
   try {
     token = await tokenStore.getToken();
-    models = await registry.getDefault().listModels(token);
+    for (const provider of registry.list()) {
+      try {
+        const pm = await provider.listModels(token);
+        if (Array.isArray(pm)) models = models.concat(pm);
+      } catch (e) {
+        vscode.window.showWarningMessage(`Provider ${provider.id}: ${e.message}`);
+      }
+    }
   } catch (e) {
     vscode.window.showErrorMessage(e.message);
     return;
