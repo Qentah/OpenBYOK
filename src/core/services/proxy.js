@@ -47,8 +47,14 @@ function start() {
       let body = Buffer.concat(chunks);
       try {
         const json = JSON.parse(body.toString());
+        // VS Code Copilot Chat attaches non-standard fields (reasoning traces,
+        // chain-of-thought ids) to messages that upstream rejects as
+        // unsupported parameters. Strip them before forwarding.
+        const STRIP_FIELDS = ['reasoning', 'cot_id', 'reasoning_content', 'reasoning_details'];
         if (Array.isArray(json.messages)) {
-          for (const m of json.messages) delete m.reasoning;
+          for (const m of json.messages) {
+            for (const f of STRIP_FIELDS) delete m[f];
+          }
         }
         body = Buffer.from(JSON.stringify(json));
       } catch { /* not JSON, pass through */ }
