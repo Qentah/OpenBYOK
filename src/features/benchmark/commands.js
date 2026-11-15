@@ -10,6 +10,19 @@ const { BENCH_TIMEOUT_MS, BENCH_CONCURRENCY } = require('../../core/constants');
 const logger = require('../../core/services/logger');
 const modelResolver = require('../../core/services/model-resolver');
 
+/** Enumerate benchmarkable chat models for the given providers (drops opencode-go non-free). */
+function enumerateModels(providers, listResults) {
+  const all = [];
+  for (const provider of providers) {
+    const pm = Array.isArray(listResults.get(provider.id)) ? listResults.get(provider.id) : [];
+    for (const m of pm) {
+      if (provider.id === 'opencode-go' && !/-free$/i.test(m.modelID)) continue;
+      all.push(m);
+    }
+  }
+  return all;
+}
+
 let running = false;
 let statusBarItem = null;
 
@@ -43,18 +56,14 @@ async function runBackgroundBenchmark() {
   running = true;
   try {
     const token = await tokenStore.getToken();
-    const all = [];
+    const resultsByProvider = new Map();
     for (const provider of registry.list()) {
       try {
         const pm = await provider.listModels(token);
-        if (!Array.isArray(pm)) continue;
-        for (const m of pm) {
-          if (provider.id === 'opencode-go' && !/-free$/i.test(m.modelID)) continue;
-          all.push(m);
-        }
-      } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ }
+        resultsByProvider.set(provider.id, Array.isArray(pm) ? pm : []);
+      } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ resultsByProvider.set(provider.id, []); }
     }
-    const models = all;
+    const models = enumerateModels(registry.list(), resultsByProvider);
     if (models.length === 0) return;
     const { timeout, concurrency } = benchConfig();
     const results = await runPool(
@@ -97,18 +106,14 @@ async function runBenchmarkWithProgress() {
         const providers = providerChoice === 'All providers'
           ? registry.list()
           : [registry.get(providerChoice)];
-        const all = [];
+        const resultsByProvider = new Map();
         for (const provider of providers) {
           try {
             const pm = await provider.listModels(token);
-            if (!Array.isArray(pm)) continue;
-            for (const m of pm) {
-              if (provider.id === 'opencode-go' && !/-free$/i.test(m.modelID)) continue;
-              all.push(m);
-            }
-          } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ }
+            resultsByProvider.set(provider.id, Array.isArray(pm) ? pm : []);
+          } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ resultsByProvider.set(provider.id, []); }
         }
-        const models = all;
+        const models = enumerateModels(providers, resultsByProvider);
         if (models.length === 0) {
           vscode.window.showWarningMessage('No chat models found.');
           return;
