@@ -20,7 +20,7 @@ Ce document et `README.md` sont traités comme du code : leur mise à jour fait 
 
 Une modification cosmétique (typo, commentaire, log) ne déclenche **pas** cette boucle — sinon elle serait abandonnée. Le critère de déclenchement est : *un lecteur de ce document risquerait désormais d'écrire du code faux*.
 
-> Dernière vérification code : 2026-11-14 (alignement docs sur le code : 11 commandes, inline completion, proxy/logger/telemetry/services, registry multi-provider, bench configurable, reload auto, status bar, QuickPick commit/benchmark).
+> Dernière vérification code : 2026-11-15 (suppression de `core/services/telemetry.js` inutilisé, ajout de `scripts/smoke.js`, écritures atomiques dans `removeGroup`, correction du tri `spd` dans `selectModels`, correction du shadowing du token d'annulation dans l'inline completion).
 
 ---
 
@@ -50,7 +50,7 @@ vscode/
     │       ├── vscode-config.js    # chatLanguageModels.json + settings.json inputs
     │       ├── proxy.js            # proxy HTTP local 127.0.0.1 (session header) pour OpenCode Go
     │       ├── logger.js           # OutputChannel "OpenBYOK"
-    │       └── telemetry.js        # module présent (opt-in via config, usage limité)
+    │       └── telemetry.js        # SUPPRIMÉ (inutilisé) — hook dans logger.js
     └── features/
         ├── byok/commands.js        # registerToken, selectModels, configureApiKey, refreshToken, logout, removeGroup
         ├── benchmark/{benchmark,commands}.js  # benchmark, cache, status bar, sélection modèle
@@ -197,12 +197,12 @@ Après écriture de `chatLanguageModels.json` : **`Developer: Reload Window`** p
 
 - `core/services/proxy.js` : proxy HTTP local (`127.0.0.1`, port `openbyok.proxyPort`, défaut **18080**) vers `https://opencode.ai/inference/go/openai/v1...`, injecte `x-opencode-session`, supprime les champs non standard des messages (allowlist des champs OpenAI standard : role, content, name, tool_calls, tool_call_id, function_call, refusal, audio) des requêtes JSON, propage les erreurs upstream (`502`). Démarré à l'activation, arrêté à la désactivation. Utilisé par le provider `opencode-go` (`baseURL` local).
 - `core/services/logger.js` : OutputChannel `OpenBYOK` (init à l'activation). Logs utilisés par proxy/benchmark/features ; l'appel télémetrie éventuel via `vscode.telemetry.sendEvent` est conditionné à `openbyok.telemetryEnabled` (best-effort, peut être ignoré selon runtime).
-- `core/services/telemetry.js` : module présent avec helper `isEnabled()`/events ; **non branché** dans les flux actuels. Rester cohérent si on l'active réellement.
+- `core/services/telemetry.js` : **supprimé** (inutilisé). Le hook télémetrie best-effort reste dans `logger.js` (conditionné à `openbyok.telemetryEnabled`). Ne pas réintroduire le module sans l'unifier au logger.
 - Configuration contribuée (`package.json` contributes.configuration) : `openbyok.commitModel`, `openbyok.commitPrompt` (`{history}`), `openbyok.proxyPort`, `openbyok.benchTimeoutMs`, `openbyok.benchConcurrency`, `openbyok.telemetryEnabled` (default `false`).
 
 ## Dettes / points ouverts
 
-- `core/services/telemetry.js` existe mais n'est pas utilisé (le logger contient un hook télémetrie best-effort séparé) → clarifier/unifier si la télémétrie devient une vraie feature.
-- `tokenStore.withTokenRetry` est exporté mais peu/pas utilisé ; `authFetch()` couvre le retry 401 réseau. Évaluer avant suppression.
-- `package.json` déclare encore `languageModelChatProviders` (vendor `openbyok`) : entrée **inerte** pour notre flux BYOK (`customendpoint`) — garder ou retirer en connaissance de cause.
-- Tests automatisés en-dehors de `src/` (`scripts/smoke.js` déclaré) → hors périmètre de cette analyse `src/`, mais à vérifier si besoin.
+- `core/services/telemetry.js` **supprimé** (aucun consommateur) ; le hook télémetrie du logger reste la seule implémentation. Si la télémétrie devient une vraie feature, l'unifier dans le logger plutôt que créer un second module.
+- `tokenStore.withTokenRetry` supprimé (aucun consommateur) ; seul `authFetch()` gère le retry 401.
+- Entrée `languageModelChatProviders` (vendor `openbyok`) retirée de `package.json` : inerte pour le flux BYOK (`customendpoint`).
+- Tests automatisés : `scripts/smoke.js` vérifie la syntaxe de tous les `.js` sous `src/` (`npm test`). Pas de tests comportementaux.
