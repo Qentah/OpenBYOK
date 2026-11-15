@@ -19,7 +19,7 @@ function updateStatusBar() {
   if (!statusBarItem) return;
   const cache = benchCache.data();
   if (cache?.timestamp && Array.isArray(cache.results) && cache.results.length) {
-    const fastest = modelResolver.fastestModel();
+    const fastest = modelResolver.bestCachedModel({ sortBy: 'spd' });
     const ageMin = Math.round((Date.now() - cache.timestamp) / 60000);
     const spdLabel = fastest?.spd != null ? `${fastest.spd}s/1k` : '';
     statusBarItem.text = `$(dashboard) OpenBYOK: ${fastest ? (fastest.name || fastest.modelID) : 'cached'} ${spdLabel} (${ageMin}m)`.trim();
@@ -72,10 +72,7 @@ async function runBackgroundBenchmark() {
  * Select the best model for inline suggestion.
  * Delegated to model-resolver (single selection implementation).
  */
-function selectBestModelForCommit(minTokensPerSec = MIN_INLINE_SUGGESTION_TOKENS_PER_SEC) {
-  const r = modelResolver.selectBestModelForCommit(minTokensPerSec);
-  return r?.key ?? null;
-}
+// selectBestModelForCommit removed: commit model = fastest model (bestCachedModel spd).
 
 async function runBenchmarkWithProgress() {
   if (running) {
@@ -167,7 +164,7 @@ async function selectFromBenchmark() {
     }
   }
   const items = [];
-  const fastest = modelResolver.fastestModel();
+  const fastest = modelResolver.bestCachedModel({ sortBy: 'spd' });
   items.push({
     label: '⚡ Auto (fastest)',
     description: fastest ? `${fastest.name || fastest.modelID} · ${fastest.spd != null ? fastest.spd + 's/1k' : ''}` : 'no cache',
@@ -203,4 +200,4 @@ function register(context) {
   );
 }
 
-module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark, selectBestModelForCommit };
+module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark };

@@ -4,7 +4,7 @@ const vscode = require('vscode');
 const tokenStore = require('./token-store');
 const benchCache = require('./bench-cache');
 const registry = require('../providers/registry');
-const { BENCH_PROMPT, MIN_INLINE_SUGGESTION_TOKENS_PER_SEC } = require('../constants');
+const { BENCH_PROMPT } = require('../constants');
 
 function opencodeProvider() {
   return require('../providers/opencode');
@@ -49,20 +49,10 @@ function bestCachedModel({ minTokensPerSec = 0, sortBy = 'spd' } = {}) {
   };
 }
 
-/** Alias kept for callers that think in "fastest" terms. */
-function fastestModel() {
-  return bestCachedModel({ sortBy: 'spd' });
-}
-
-/** Alias kept for callers that think in "commit selection" terms. */
-function selectBestModelForCommit(minTokensPerSec = MIN_INLINE_SUGGESTION_TOKENS_PER_SEC) {
-  return bestCachedModel({ minTokensPerSec, sortBy: 'ttft' });
-}
-
 /**
  * Resolve a model from a configured setting id, or fall back to the benchmark
- * cache. Returns a full catalogue model when the token is available, otherwise
- * a minimal { baseURL, modelID, name, prompt } object from the cache.
+ * cache (fastest by spd). Returns a full catalogue model when the token is
+ * available, otherwise a minimal { baseURL, modelID, name, prompt } object.
  *
  * Throws when settingId is given but cannot be resolved (callers decide whether
  * to fall back to the cache).
@@ -80,10 +70,10 @@ async function resolveModelFor(token, settingId) {
 }
 
 /**
- * High-level resolution used by features: setting first, then cache fallback.
- * Returns a model object or null (never throws).
+ * High-level resolution used by features: setting first, then cache fallback
+ * (fastest model). Returns a model object or null (never throws).
  */
-async function resolveModel({ settingId, minTokensPerSec = 0, sortBy = 'spd' } = {}) {
+async function resolveModel({ settingId } = {}) {
   if (settingId) {
     try {
       const token = await tokenStore.getToken();
@@ -91,19 +81,7 @@ async function resolveModel({ settingId, minTokensPerSec = 0, sortBy = 'spd' } =
       if (m?.baseURL && m?.modelID) return m;
     } catch { /* fall through to cache */ }
   }
-  if (minTokensPerSec > 0) {
-    const best = bestCachedModel({ minTokensPerSec, sortBy: 'ttft' });
-    if (best?.baseURL && best?.modelID) {
-      try {
-        const token = await tokenStore.getToken();
-        const m = await resolveModelFor(token, best.key ?? best.modelID);
-        if (m?.baseURL && m?.modelID) return m;
-      } catch { /* fall through */ }
-      return { baseURL: best.baseURL, modelID: best.modelID, name: best.name, prompt: BENCH_PROMPT };
-    }
-    return null;
-  }
-  const cached = bestCachedModel({ sortBy });
+  const cached = bestCachedModel({ sortBy: 'spd' });
   if (cached?.baseURL && cached?.modelID) {
     return { baseURL: cached.baseURL, modelID: cached.modelID, name: cached.name, prompt: BENCH_PROMPT };
   }
@@ -112,8 +90,6 @@ async function resolveModel({ settingId, minTokensPerSec = 0, sortBy = 'spd' } =
 
 module.exports = {
   bestCachedModel,
-  fastestModel,
-  selectBestModelForCommit,
   resolveModelFor,
   resolveModel,
 };

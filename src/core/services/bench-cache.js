@@ -40,22 +40,7 @@ function getEntry(key) {
   return cache?.results?.find((r) => r.key === key) ?? null;
 }
 
-function fastestModel() {
-  // Delegate to the single model-selection implementation (model-resolver).
-  // Kept here for backward compat; new code should call model-resolver directly.
-  try {
-    const mr = require('./model-resolver');
-    const r = mr.bestCachedModel({ sortBy: 'spd' });
-    if (!r) return null;
-    return { baseURL: r.baseURL, modelID: r.modelID, name: r.name, spd: r.spd };
-  } catch {
-    const valid = (cache?.results || [])
-      .filter((r) => r?.baseURL && r?.modelID)
-      .sort((a, b) => (a.spd ?? Infinity) - (b.spd ?? Infinity));
-    if (!valid[0]) return null;
-    return { baseURL: valid[0].baseURL, modelID: valid[0].modelID, name: valid[0].name || valid[0].modelID, spd: valid[0].spd };
-  }
-}
+// fastestModel removed: callers use model-resolver.bestCachedModel({ sortBy: 'spd' }).
 
 function clear() {
   cache = null;
@@ -64,4 +49,4 @@ function clear() {
 
 function data() { return cache; }
 
-module.exports = { load, save, isFresh, ageLabel, getEntry, fastestModel, clear, data };
+module.exports = { load, save, isFresh, ageLabel, getEntry, clear, data };

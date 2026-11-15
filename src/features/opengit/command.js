@@ -8,7 +8,7 @@ const benchCache = require('../../core/services/bench-cache');
 const benchmark = require('../benchmark/commands');
 const modelResolver = require('../../core/services/model-resolver');
 const { chatCompletion } = require('../../core/services/chat');
-const { MIN_INLINE_SUGGESTION_TOKENS_PER_SEC } = require('../../core/constants');
+// (MIN_INLINE... no longer needed)
 
 const COMMIT_PROMPT = `You are a git expert. Generate a concise commit message in English (conventional commits style: feat/fix/chore/refactor/docs/test/...) for the following diff. Reply ONLY with the commit message, no explanation, no markdown code block.
 
@@ -57,7 +57,7 @@ async function generateCommitMessage(context) {
         }
         label = model.name || model.modelID;
       } else {
-        const best = modelResolver.bestCachedModel({ minTokensPerSec: MIN_INLINE_SUGGESTION_TOKENS_PER_SEC, sortBy: 'ttft' });
+        const best = modelResolver.bestCachedModel({ sortBy: 'spd' });
         if (!best) {
           vscode.window.showWarningMessage('OpenBYOK: aucun modèle disponible pour générer un message de commit.');
           return;

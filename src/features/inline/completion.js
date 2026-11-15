@@ -18,7 +18,7 @@ const MIN_INTERVAL_MS = 150;
 async function resolveModel() {
   const cfg = vscode.workspace.getConfiguration('openbyok');
   const settingId = cfg.get('commitModel')?.toString().trim();
-  return await modelResolver.resolveModel({ settingId, sortBy: 'ttft' });
+  return await modelResolver.resolveModel({ settingId });
 }
 
 function buildPrompt(document, position) {
