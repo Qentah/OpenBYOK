@@ -71,8 +71,8 @@ async function provideInlineCompletionItems(document, position, context, token) 
   const prompt = buildPrompt(document, position);
   let completion;
   try {
-    const token = await tokenStore.getToken();
-    completion = await chatCompletion(model.baseURL, model.modelID, token, prompt, COMPLETION_TIMEOUT_MS);
+    const authToken = await tokenStore.getToken();
+    completion = await chatCompletion(model.baseURL, model.modelID, authToken, prompt, COMPLETION_TIMEOUT_MS);
   } catch (e) {
     logger.warn('inline completion failed', e);
     return [];
