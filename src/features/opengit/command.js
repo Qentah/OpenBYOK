@@ -49,9 +49,6 @@ async function generateCommitMessage(context) {
       if (settingId) {
         model = await registry.getDefault().resolveModelFor(token, settingId);
         label = model.name || model.modelID;
-        if (!settingId) {
-          vscode.window.showInformationMessage(`OpenBYOK: commitModel configuré mais invalide — utilisation du modèle le plus rapide (${label}).`);
-        }
       } else {
         // No commitModel configured, select the best model automatically
                 const bestModelKey = benchmark.selectBestModelForCommit();
