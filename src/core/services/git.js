@@ -12,16 +12,20 @@ function workspaceFolder() {
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 
-/** Staged diff first, then unstaged. Returns '' when nothing changed. */
+/** Staged diff first; if none, fall back to unstaged diff. Returns '' when nothing changed. */
 async function getGitDiff() {
   const folder = workspaceFolder();
   if (!folder) throw new Error('No workspace folder open.');
-  for (const args of [['diff', '--cached'], ['diff']]) {
-    try {
-      const { stdout } = await execFileAsync('git', args, { cwd: folder });
-      if (stdout && stdout.trim()) return stdout;
-    } catch {}
-  }
+  // Prefer staged changes.
+  try {
+    const { stdout } = await execFileAsync('git', ['diff', '--cached'], { cwd: folder });
+    if (stdout && stdout.trim()) return stdout;
+  } catch {}
+  // If no staged changes, use the working tree diff.
+  try {
+    const { stdout } = await execFileAsync('git', ['diff'], { cwd: folder });
+    if (stdout && stdout.trim()) return stdout;
+  } catch {}
   return '';
 }
 
