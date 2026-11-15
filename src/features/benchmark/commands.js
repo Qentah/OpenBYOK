@@ -6,7 +6,7 @@ const benchCache = require('../../core/services/bench-cache');
 const registry = require('../../core/providers/registry');
 const { runPool } = require('../../core/utils');
 const { benchmarkModel, toCacheEntry } = require('./benchmark');
-const { BENCH_TIMEOUT_MS, BENCH_CONCURRENCY } = require('../../core/constants');
+const { BENCH_TIMEOUT_MS, BENCH_CONCURRENCY, MIN_INLINE_SUGGESTION_TOKENS_PER_SEC } = require('../../core/constants');
 const logger = require('../../core/services/logger');
 
 let running = false;

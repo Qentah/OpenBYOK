@@ -1,5 +1,6 @@
 .venv/
 .vscode/
 .agents/
+.github/
 skills-lock.json
 specs/
