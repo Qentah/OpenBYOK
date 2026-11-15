@@ -2,15 +2,14 @@
 
 const { getJson } = require('../services/http');
 const { sanitizeLimits } = require('../utils');
-const tokenStore = require('../services/token-store');
 
 const proxy = require('../services/proxy');
 const GO_MODELS_URL = 'https://opencode.ai/inference/go/v1/models';
 function goBaseUrl() { return `http://127.0.0.1:${proxy.proxyPort()}`; }
 
-async function listModels() {
-  const token = await tokenStore.getToken();
-  const data = await getJson(GO_MODELS_URL, { Authorization: `Bearer ${token}` });
+async function listModels(token) {
+  const t = token ?? (await require('../services/token-store').getToken());
+  const data = await getJson(GO_MODELS_URL, { Authorization: `Bearer ${t}` });
   const items = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
   const rows = [];
   for (const m of items) {
@@ -47,7 +46,7 @@ async function listModels() {
 }
 
 async function findModelById(token, id) {
-  const models = await listModels();
+  const models = await listModels(token);
   const found = models.find((m) => m.modelID === id || m.key === id);
   if (!found) throw new Error(`Model "${id}" not found.`);
   return found;
