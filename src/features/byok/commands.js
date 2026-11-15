@@ -300,9 +300,8 @@ async function promptConfigureApiKeyForGroup(name, vendor = 'customendpoint') {
 }
 
 async function configureApiKey(targetGroupName) {
-  const groups = vsConfig.readChatLanguageModels().filter(
-    (e) => String(e?.name ?? '').startsWith('OpenBYOK ')
-      && ['customendpoint', 'openbyok'].includes(String(e?.vendor ?? ''))
+  const groups = vsConfig.listOpenByokGroups().filter(
+    (e) => ['customendpoint', 'openbyok'].includes(String(e?.vendor ?? ''))
   );
   if (groups.length === 0) {
     vscode.window.showWarningMessage('No OpenBYOK group found. Run "OpenBYOK: Select Models for BYOK" first.');
@@ -329,9 +328,7 @@ async function configureApiKey(targetGroupName) {
 }
 
 async function removeGroup() {
-  const groups = vsConfig.readChatLanguageModels().filter(
-    (e) => String(e?.name ?? '').startsWith('OpenBYOK ')
-  );
+  const groups = vsConfig.listOpenByokGroups();
   if (groups.length === 0) {
     vscode.window.showWarningMessage('No OpenBYOK group found.');
     return;
@@ -341,12 +338,7 @@ async function removeGroup() {
     { placeHolder: 'Which OpenBYOK group to remove?' }
   );
   if (!pick) return;
-  const all = vsConfig.readChatLanguageModels();
-  const filtered = all.filter((e) => String(e?.name ?? '') !== pick.label);
-  const clmPath = vsConfig.getChatLanguageModelsPath();
-  const fs = require('fs');
-  fs.writeFileSync(clmPath + '.tmp', JSON.stringify(filtered, null, 2));
-  fs.renameSync(clmPath + '.tmp', clmPath);
+  vsConfig.removeChatLanguageModel(pick.label);
   // Remove orphaned input declarations that no longer referenced.
   try { vsConfig.ensureInputDefinition(); } catch {}
   vscode.window.showInformationMessage(`Removed group "${pick.label}". Reload the window to apply.`);

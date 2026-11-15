@@ -19,16 +19,28 @@ function readJsonSafe(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 }
 
-function upsertChatLanguageModel(entry) {
+function writeChatLanguageModels(entries) {
   const clmPath = getChatLanguageModelsPath();
-  let existing = readJsonSafe(clmPath, []);
-  if (!Array.isArray(existing)) existing = [];
-  const filtered = existing.filter((e) => String(e?.name ?? '') !== String(entry?.name ?? ''));
-  const merged = [...filtered, entry];
   const tmp = clmPath + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2));
+  fs.writeFileSync(tmp, JSON.stringify(entries, null, 2));
   fs.renameSync(tmp, clmPath);
-  return merged;
+  return entries;
+}
+
+function upsertChatLanguageModel(entry) {
+  const existing = readChatLanguageModels();
+  const filtered = existing.filter((e) => String(e?.name ?? '') !== String(entry?.name ?? ''));
+  return writeChatLanguageModels([...filtered, entry]);
+}
+
+function removeChatLanguageModel(name) {
+  const existing = readChatLanguageModels();
+  const filtered = existing.filter((e) => String(e?.name ?? '') !== String(name ?? ''));
+  return writeChatLanguageModels(filtered);
+}
+
+function listOpenByokGroups() {
+  return readChatLanguageModels().filter((e) => String(e?.name ?? '').startsWith('OpenBYOK '));
 }
 
 function ensureInputDefinition() {
@@ -96,4 +108,4 @@ function readChatLanguageModels() {
   return Array.isArray(clm) ? clm : [];
 }
 
-module.exports = { userSettingsPath, getChatLanguageModelsPath, readJsonSafe, upsertChatLanguageModel, ensureInputDefinition, readChatLanguageModels, repairModelLimits };
+module.exports = { userSettingsPath, getChatLanguageModelsPath, readJsonSafe, writeChatLanguageModels, upsertChatLanguageModel, removeChatLanguageModel, listOpenByokGroups, ensureInputDefinition, readChatLanguageModels, repairModelLimits };
