@@ -6,10 +6,6 @@ const benchCache = require('./bench-cache');
 const registry = require('../providers/registry');
 const { BENCH_PROMPT } = require('../constants');
 
-function opencodeProvider() {
-  return require('../providers/opencode');
-}
-
 /**
  * Single source of truth for "which cached benchmark result is the best model".
  *
@@ -59,12 +55,22 @@ function bestCachedModel({ minTokensPerSec = 0, sortBy = 'spd' } = {}) {
  */
 async function resolveModelFor(token, settingId) {
   if (settingId) {
-    return await opencodeProvider().findModelById(token, settingId);
+    for (const provider of registry.list()) {
+      if (typeof provider.findModelById !== 'function') continue;
+      try {
+        return await provider.findModelById(token, settingId);
+      } catch { /* try next provider */ }
+    }
+    throw new Error(`Model "${settingId}" not found.`);
   }
   const bench = bestCachedModel({ sortBy: 'spd' });
   if (bench) {
-    try { return await opencodeProvider().findModelById(token, bench.key ?? bench.modelID); }
-    catch { return { baseURL: bench.baseURL, modelID: bench.modelID, name: bench.name, prompt: BENCH_PROMPT }; }
+    for (const provider of registry.list()) {
+      if (typeof provider.findModelById !== 'function') continue;
+      try { return await provider.findModelById(token, bench.key ?? bench.modelID); }
+      catch { /* try next provider */ }
+    }
+    return { baseURL: bench.baseURL, modelID: bench.modelID, name: bench.name, prompt: BENCH_PROMPT };
   }
   throw new Error('No model configured and no benchmark cache. Run "OpenBYOK: Run Benchmark (with progress)".');
 }
