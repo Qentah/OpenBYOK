@@ -48,12 +48,17 @@ function start() {
       try {
         const json = JSON.parse(body.toString());
         // VS Code Copilot Chat attaches non-standard fields (reasoning traces,
-        // chain-of-thought ids) to messages that upstream rejects as
-        // unsupported parameters. Strip them before forwarding.
-        const STRIP_FIELDS = ['reasoning', 'cot_id', 'reasoning_content', 'reasoning_details'];
+        // chain-of-thought ids/summaries, etc.) to messages that upstream
+        // rejects as unsupported parameters. Keep only OpenAI-standard fields.
+        const ALLOWED_TOP_LEVEL = new Set(['model','messages','stream','temperature','top_p','max_tokens','max_completion_tokens','n','stop','presence_penalty','frequency_penalty','logit_bias','user','seed','tools','tool_choice','response_format','logprobs','top_logprobs','stream_options','parallel_tool_calls','reasoning_effort']);
+                const ALLOWED_MSG_FIELDS = new Set(['role','content','name','tool_calls','tool_call_id','function_call','refusal','audio']);
+                // Only keep OpenAI-standard fields at both top level and per message.
+                for (const k of Object.keys(json)) { if (!ALLOWED_TOP_LEVEL.has(k)) delete json[k]; }
         if (Array.isArray(json.messages)) {
           for (const m of json.messages) {
-            for (const f of STRIP_FIELDS) delete m[f];
+                    if (m && typeof m === 'object' && !Array.isArray(m)) {
+                      for (const k of Object.keys(m)) { if (!ALLOWED_MSG_FIELDS.has(k)) delete m[k]; }
+            }
           }
         }
         body = Buffer.from(JSON.stringify(json));
