@@ -6,7 +6,9 @@ const git = require('../../core/services/git');
 const registry = require('../../core/providers/registry');
 const benchCache = require('../../core/services/bench-cache');
 const benchmark = require('../benchmark/commands');
+const modelResolver = require('../../core/services/model-resolver');
 const { chatCompletion } = require('../../core/services/chat');
+const { MIN_INLINE_SUGGESTION_TOKENS_PER_SEC } = require('../../core/constants');
 
 const COMMIT_PROMPT = `You are a git expert. Generate a concise commit message in English (conventional commits style: feat/fix/chore/refactor/docs/test/...) for the following diff. Reply ONLY with the commit message, no explanation, no markdown code block.
 
@@ -47,20 +49,27 @@ async function generateCommitMessage(context) {
       let model;
       let label;
       if (settingId) {
-        model = await registry.getDefault().resolveModelFor(token, settingId);
+        try {
+          model = await registry.getDefault().resolveModelFor(token, settingId);
+        } catch (e) {
+          vscode.window.showErrorMessage(`OpenBYOK: ${e.message}`);
+          return;
+        }
         label = model.name || model.modelID;
       } else {
-        // No commitModel configured, select the best model automatically
-                const bestModelKey = benchmark.selectBestModelForCommit();
-        if (bestModelKey) {
-          model = await registry.getDefault().resolveModelFor(token, bestModelKey);
-          label = model.name || model.modelID;
-          vscode.window.showInformationMessage(`OpenBYOK: aucun commitModel configuré — utilisation du modèle le plus rapide (${label}).`);
-        } else {
+        const best = modelResolver.bestCachedModel({ minTokensPerSec: MIN_INLINE_SUGGESTION_TOKENS_PER_SEC, sortBy: 'ttft' });
+        if (!best) {
           vscode.window.showWarningMessage('OpenBYOK: aucun modèle disponible pour générer un message de commit.');
           return;
         }
-    }
+        try {
+          model = await registry.getDefault().resolveModelFor(token, best.key ?? best.modelID);
+        } catch {
+          model = { baseURL: best.baseURL, modelID: best.modelID, name: best.name, prompt: require('../../core/constants').BENCH_PROMPT };
+        }
+        label = model.name || model.modelID;
+        vscode.window.showInformationMessage(`OpenBYOK: aucun commitModel configuré — utilisation du modèle le plus rapide (${label}).`);
+      }
     vscode.window.withProgress(
       { location: vscode.ProgressLocation.Window, title: `OpenBYOK: generating commit message (${label})…` },
       async () => {

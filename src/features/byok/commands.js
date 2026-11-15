@@ -3,6 +3,7 @@
 const vscode = require('vscode');
 const tokenStore = require('../../core/services/token-store');
 const benchCache = require('../../core/services/bench-cache');
+const modelResolver = require('../../core/services/model-resolver');
 const vsConfig = require('../../core/services/vscode-config');
 const registry = require('../../core/providers/registry');
 const { normUrl } = require('../../core/utils');

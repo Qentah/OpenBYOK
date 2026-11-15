@@ -6,6 +6,7 @@ const tokenStore = require('../services/token-store');
 const benchCache = require('../services/bench-cache');
 const { CONSOLE_API, CATALOGUE_API, DEFAULT_SERVER, CLIENT_ID, BENCH_PROMPT } = require('../constants');
 const { normUrl, sleep, sanitizeLimits } = require('../utils');
+const modelResolver = require('../services/model-resolver');
 
 /* ---------- Catalogue / config consolidation ---------- */
 
@@ -192,15 +193,9 @@ async function refreshToken() {
 
 /* ---------- Model resolution for features (e.g. OpenBYOK) ---------- */
 
-/** Setting openbyok.commitModel > best cached benchmark > error. */
+/** Setting openbyok.commitModel > best cached benchmark > error. Delegated to model-resolver. */
 async function resolveModelFor(token, settingId) {
-  if (settingId) return findModelById(token, settingId);
-  const bench = benchCache.fastestModel();
-  if (bench) {
-    try { return await findModelById(token, bench.modelID); }
-    catch { return { baseURL: bench.baseURL, modelID: bench.modelID, name: bench.name, prompt: BENCH_PROMPT }; }
-  }
-  throw new Error('No model configured and no benchmark cache. Run "OpenBYOK: Run Benchmark (with progress)".');
+  return modelResolver.resolveModelFor(token, settingId);
 }
 
 const cli = require('./opencode-cli');

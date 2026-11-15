@@ -8,6 +8,7 @@ const { runPool } = require('../../core/utils');
 const { benchmarkModel, toCacheEntry } = require('./benchmark');
 const { BENCH_TIMEOUT_MS, BENCH_CONCURRENCY } = require('../../core/constants');
 const logger = require('../../core/services/logger');
+const modelResolver = require('../../core/services/model-resolver');
 
 let running = false;
 let statusBarItem = null;
@@ -18,7 +19,7 @@ function updateStatusBar() {
   if (!statusBarItem) return;
   const cache = benchCache.data();
   if (cache?.timestamp && Array.isArray(cache.results) && cache.results.length) {
-    const fastest = benchCache.fastestModel();
+    const fastest = modelResolver.fastestModel();
     const ageMin = Math.round((Date.now() - cache.timestamp) / 60000);
     const spdLabel = fastest?.spd != null ? `${fastest.spd}s/1k` : '';
     statusBarItem.text = `$(dashboard) OpenBYOK: ${fastest ? (fastest.name || fastest.modelID) : 'cached'} ${spdLabel} (${ageMin}m)`.trim();
@@ -68,30 +69,12 @@ async function runBackgroundBenchmark() {
 }
 
 /**
- * Select the best model for inline suggestion:
- * - Filter benchmark results to those with tokensPerSec >= minTokensPerSec
- * - Sort by ttftMs ascending (shortest time to first token)
- * - Return the first model's key, or null if none match
+ * Select the best model for inline suggestion.
+ * Delegated to model-resolver (single selection implementation).
  */
 function selectBestModelForCommit(minTokensPerSec = MIN_INLINE_SUGGESTION_TOKENS_PER_SEC) {
-  const cache = benchCache.data();
-  if (!cache?.results?.length) return null;
-
-  // Filter models meeting the token throughput requirement
-  const eligible = cache.results.filter(r => r.tokensPerSec >= minTokensPerSec);
-  if (eligible.length === 0) return null;
-
-  // Sort by TTFT (time to first token) ascending, then by spd (seconds per 1k) ascending
-  eligible.sort((a, b) => {
-    const ttftA = a.ttftMs ?? Infinity;
-    const ttftB = b.ttftMs ?? Infinity;
-    if (ttftA !== ttftB) return ttftA - ttftB;
-    const spdA = a.spd ?? Infinity;
-    const spdB = b.spd ?? Infinity;
-    return spdA - spdB;
-  });
-
-  return eligible[0]?.key ?? null;
+  const r = modelResolver.selectBestModelForCommit(minTokensPerSec);
+  return r?.key ?? null;
 }
 
 async function runBenchmarkWithProgress() {
@@ -184,7 +167,7 @@ async function selectFromBenchmark() {
     }
   }
   const items = [];
-  const fastest = benchCache.fastestModel();
+  const fastest = modelResolver.fastestModel();
   items.push({
     label: '⚡ Auto (fastest)',
     description: fastest ? `${fastest.name || fastest.modelID} · ${fastest.spd != null ? fastest.spd + 's/1k' : ''}` : 'no cache',

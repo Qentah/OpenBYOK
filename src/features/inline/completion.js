@@ -4,6 +4,7 @@ const vscode = require('vscode');
 const tokenStore = require('../../core/services/token-store');
 const benchCache = require('../../core/services/bench-cache');
 const registry = require('../../core/providers/registry');
+const modelResolver = require('../../core/services/model-resolver');
 const { chatCompletion } = require('../../core/services/chat');
 const logger = require('../../core/services/logger');
 
@@ -17,18 +18,7 @@ const MIN_INTERVAL_MS = 150;
 async function resolveModel() {
   const cfg = vscode.workspace.getConfiguration('openbyok');
   const settingId = cfg.get('commitModel')?.toString().trim();
-  if (settingId) {
-    try {
-      const token = await tokenStore.getToken();
-      const m = await registry.getDefault().resolveModelFor(token, settingId);
-      if (m?.baseURL && m?.modelID) return m;
-    } catch { /* fall through */ }
-  }
-  const fastest = benchCache.fastestModel();
-  if (fastest?.baseURL && fastest?.modelID) {
-    return { baseURL: fastest.baseURL, modelID: fastest.modelID, name: fastest.name };
-  }
-  return null;
+  return await modelResolver.resolveModel({ settingId, sortBy: 'ttft' });
 }
 
 function buildPrompt(document, position) {
