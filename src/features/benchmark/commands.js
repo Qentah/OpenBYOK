@@ -51,28 +51,59 @@ function benchConfig() {
   };
 }
 
+/**
+ * Single deep module owning the benchmark pipeline:
+ * list models per provider -> enumerate (filter non-free) -> runPool -> save cache -> update status bar.
+ * `progress` (vscode progress) and `cancelToken` are optional (background mode passes null).
+ * Returns the saved results array.
+ */
+async function runBenchmark({ providers, progress, cancelToken, token }) {
+  const resultsByProvider = new Map();
+  for (const provider of providers) {
+    try {
+      const pm = await provider.listModels(token);
+      resultsByProvider.set(provider.id, Array.isArray(pm) ? pm : []);
+    } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ resultsByProvider.set(provider.id, []); }
+  }
+  const models = enumerateModels(providers, resultsByProvider);
+  if (models.length === 0) {
+    if (progress) vscode.window.showWarningMessage('No chat models found.');
+    return [];
+  }
+  if (progress) progress.report({ message: `0/${models.length} models…` });
+  let done = 0;
+  const { timeout, concurrency } = benchConfig();
+  const results = await runPool(
+    models,
+    async (m) => {
+      if (cancelToken && cancelToken.isCancellationRequested) return null;
+      const r = await benchmarkModel(m, token, timeout);
+      if (progress) {
+        done++;
+        progress.report({
+          message: `${done}/${models.length} — ${m.key} → ${r.status}`,
+          increment: 100 / models.length,
+        });
+      }
+      return toCacheEntry(m, r);
+    },
+    concurrency
+  );
+  const toSave = cancelToken ? results.filter(Boolean) : results;
+  benchCache.save(toSave);
+  updateStatusBar();
+  if (progress) {
+    vscode.window.showInformationMessage(`Benchmark complete: ${toSave.length} models cached.`);
+  }
+  return toSave;
+}
+
 async function runBackgroundBenchmark() {
   if (running) return;
   running = true;
   try {
     const token = await tokenStore.getToken();
-    const resultsByProvider = new Map();
-    for (const provider of registry.list()) {
-      try {
-        const pm = await provider.listModels(token);
-        resultsByProvider.set(provider.id, Array.isArray(pm) ? pm : []);
-      } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ resultsByProvider.set(provider.id, []); }
-    }
-    const models = enumerateModels(registry.list(), resultsByProvider);
-    if (models.length === 0) return;
-    const { timeout, concurrency } = benchConfig();
-    const results = await runPool(
-      models,
-      (m) => benchmarkModel(m, token, timeout).then((r) => toCacheEntry(m, r)),
-      concurrency
-    );
-    benchCache.save(results);
-    updateStatusBar();
+    await runBenchmark({ providers: registry.list(), progress: null, cancelToken: null, token });
   } catch (e) { logger.warn('background benchmark failed', e); /* silent in background */ }
   finally { running = false; }
 }
@@ -106,39 +137,7 @@ async function runBenchmarkWithProgress() {
         const providers = providerChoice === 'All providers'
           ? registry.list()
           : [registry.get(providerChoice)];
-        const resultsByProvider = new Map();
-        for (const provider of providers) {
-          try {
-            const pm = await provider.listModels(token);
-            resultsByProvider.set(provider.id, Array.isArray(pm) ? pm : []);
-          } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ resultsByProvider.set(provider.id, []); }
-        }
-        const models = enumerateModels(providers, resultsByProvider);
-        if (models.length === 0) {
-          vscode.window.showWarningMessage('No chat models found.');
-          return;
-        }
-        progress.report({ message: `0/${models.length} models…` });
-        let done = 0;
-        const results = await runPool(
-          models,
-          async (m) => {
-            if (cancelToken.isCancellationRequested) return null;
-            const { timeout } = benchConfig();
-            const r = await benchmarkModel(m, token, timeout);
-            done++;
-            progress.report({
-              message: `${done}/${models.length} — ${m.key} → ${r.status}`,
-              increment: 100 / models.length,
-            });
-            return toCacheEntry(m, r);
-          },
-          benchConfig().concurrency
-        );
-        const valid = results.filter(Boolean);
-        benchCache.save(valid);
-        updateStatusBar();
-        vscode.window.showInformationMessage(`Benchmark complete: ${valid.length} models cached.`);
+        await runBenchmark({ providers, progress, cancelToken, token });
       }
     );
     return true;
@@ -205,4 +204,4 @@ function register(context) {
   );
 }
 
-module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark };
+module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, runBenchmark, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark, enumerateModels };
