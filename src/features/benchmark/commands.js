@@ -1,27 +1,15 @@
-'use strict';
+﻿'use strict';
 
 const vscode = require('vscode');
 const tokenStore = require('../../core/services/token-store');
 const benchCache = require('../../core/services/bench-cache');
 const registry = require('../../core/providers/registry');
+const modelCatalogue = require('../../core/services/model-catalogue');
 const { runPool } = require('../../core/utils');
 const { benchmarkModel, toCacheEntry } = require('./benchmark');
 const { BENCH_TIMEOUT_MS, BENCH_CONCURRENCY } = require('../../core/constants');
 const logger = require('../../core/services/logger');
 const modelResolver = require('../../core/services/model-resolver');
-
-/** Enumerate benchmarkable chat models for the given providers (drops opencode-go non-free). */
-function enumerateModels(providers, listResults) {
-  const all = [];
-  for (const provider of providers) {
-    const pm = Array.isArray(listResults.get(provider.id)) ? listResults.get(provider.id) : [];
-    for (const m of pm) {
-      if (provider.id === 'opencode-go' && !/-free$/i.test(m.modelID)) continue;
-      all.push(m);
-    }
-  }
-  return all;
-}
 
 let running = false;
 let statusBarItem = null;
@@ -103,7 +91,17 @@ async function runBackgroundBenchmark() {
   running = true;
   try {
     const token = await tokenStore.getToken();
-    await runBenchmark({ providers: registry.list(), progress: null, cancelToken: null, token });
+    const cat = await modelCatalogue.listAll(token, { providers: registry.list(), benchableOnly: true });
+    const models = cat.models;
+    if (models.length === 0) return;
+    const { timeout, concurrency } = benchConfig();
+    const results = await runPool(
+      models,
+      (m) => benchmarkModel(m, token, timeout).then((r) => toCacheEntry(m, r)),
+      concurrency
+    );
+    benchCache.save(results);
+    updateStatusBar();
   } catch (e) { logger.warn('background benchmark failed', e); /* silent in background */ }
   finally { running = false; }
 }
@@ -137,7 +135,33 @@ async function runBenchmarkWithProgress() {
         const providers = providerChoice === 'All providers'
           ? registry.list()
           : [registry.get(providerChoice)];
-        await runBenchmark({ providers, progress, cancelToken, token });
+        const cat = await modelCatalogue.listAll(token, { providers, benchableOnly: true });
+        const models = cat.models;
+        if (models.length === 0) {
+          vscode.window.showWarningMessage('No chat models found.');
+          return;
+        }
+        progress.report({ message: `0/${models.length} models…` });
+        let done = 0;
+        const results = await runPool(
+          models,
+          async (m) => {
+            if (cancelToken.isCancellationRequested) return null;
+            const { timeout } = benchConfig();
+            const r = await benchmarkModel(m, token, timeout);
+            done++;
+            progress.report({
+              message: `${done}/${models.length} — ${m.key} → ${r.status}`,
+              increment: 100 / models.length,
+            });
+            return toCacheEntry(m, r);
+          },
+          benchConfig().concurrency
+        );
+        const valid = results.filter(Boolean);
+        benchCache.save(valid);
+        updateStatusBar();
+        vscode.window.showInformationMessage(`Benchmark complete: ${valid.length} models cached.`);
       }
     );
     return true;
@@ -204,4 +228,5 @@ function register(context) {
   );
 }
 
-module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, runBenchmark, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark, enumerateModels };
+module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark };
+
