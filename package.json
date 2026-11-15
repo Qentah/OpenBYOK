@@ -8,7 +8,7 @@
   "categories": ["Other"],
   "main": "./src/extension.js",
   "scripts": {
-    "test": "node scripts/smoke.js",
+    "test": "node scripts/smoke.js && node scripts/proxy-shape.test.js",
     "check": "node -c src/extension.js"
   },
   "contributes": {

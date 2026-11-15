@@ -11,6 +11,9 @@ const TARGET_HOST = 'opencode.ai';
 const TARGET_PATH_PREFIX = '/inference/go/openai/v1';
 const MAX_SESSIONS = 1000;
 
+const ALLOWED_TOP_LEVEL_FIELDS = new Set(['model','messages','stream','temperature','top_p','max_tokens','max_completion_tokens','n','stop','presence_penalty','frequency_penalty','logit_bias','user','seed','tools','tool_choice','response_format','logprobs','top_logprobs','stream_options','parallel_tool_calls','reasoning_effort']);
+const ALLOWED_MESSAGE_FIELDS = new Set(['role','content','name','tool_calls','tool_call_id','function_call','refusal','audio']);
+
 let server = null;
 const sessionMap = new Map();
 
@@ -26,6 +29,47 @@ function getSessionId(req) {
     sessionMap.set(key, randomUUID());
   }
   return sessionMap.get(key);
+}
+
+/**
+ * Pure request-body shaping: keep only OpenAI-standard fields at top level and
+ * per message. Returns a Buffer (original bytes on parse failure / non-object).
+ */
+function shapeRequest(rawBody) {
+  let input;
+  if (Buffer.isBuffer(rawBody)) input = rawBody;
+  else if (typeof rawBody === 'string') input = Buffer.from(rawBody);
+  else if (rawBody == null) input = Buffer.alloc(0);
+  else input = Buffer.from(String(rawBody));
+
+  if (input.length === 0) return Buffer.alloc(0);
+
+  let json;
+  try {
+    json = JSON.parse(input.toString('utf8'));
+  } catch {
+    return Buffer.from(input);
+  }
+  if (typeof json !== 'object' || json === null || Array.isArray(json)) {
+    return Buffer.from(input);
+  }
+
+  // top-level allowlist
+  for (const k of Object.keys(json)) {
+    if (!ALLOWED_TOP_LEVEL_FIELDS.has(k)) delete json[k];
+  }
+  // per-message allowlist
+  if (Array.isArray(json.messages)) {
+    for (const m of json.messages) {
+      if (m && typeof m === 'object' && !Array.isArray(m)) {
+        for (const k of Object.keys(m)) {
+          if (!ALLOWED_MESSAGE_FIELDS.has(k)) delete m[k];
+        }
+      }
+    }
+  }
+
+  return Buffer.from(JSON.stringify(json));
 }
 
 function proxyPort() {
@@ -44,25 +88,7 @@ function start() {
     const chunks = [];
     req.on('data', (c) => chunks.push(c));
     req.on('end', () => {
-      let body = Buffer.concat(chunks);
-      try {
-        const json = JSON.parse(body.toString());
-        // VS Code Copilot Chat attaches non-standard fields (reasoning traces,
-        // chain-of-thought ids/summaries, etc.) to messages that upstream
-        // rejects as unsupported parameters. Keep only OpenAI-standard fields.
-        const ALLOWED_TOP_LEVEL = new Set(['model','messages','stream','temperature','top_p','max_tokens','max_completion_tokens','n','stop','presence_penalty','frequency_penalty','logit_bias','user','seed','tools','tool_choice','response_format','logprobs','top_logprobs','stream_options','parallel_tool_calls','reasoning_effort']);
-                const ALLOWED_MSG_FIELDS = new Set(['role','content','name','tool_calls','tool_call_id','function_call','refusal','audio']);
-                // Only keep OpenAI-standard fields at both top level and per message.
-                for (const k of Object.keys(json)) { if (!ALLOWED_TOP_LEVEL.has(k)) delete json[k]; }
-        if (Array.isArray(json.messages)) {
-          for (const m of json.messages) {
-                    if (m && typeof m === 'object' && !Array.isArray(m)) {
-                      for (const k of Object.keys(m)) { if (!ALLOWED_MSG_FIELDS.has(k)) delete m[k]; }
-            }
-          }
-        }
-        body = Buffer.from(JSON.stringify(json));
-      } catch { /* not JSON, pass through */ }
+      const body = shapeRequest(Buffer.concat(chunks));
       const headers = { ...req.headers, host: TARGET_HOST, 'x-opencode-session': sessionId, 'content-length': body.length };
       const proxyReq = https.request(targetUrl, { method: req.method, headers }, (proxyRes) => {
         res.writeHead(proxyRes.statusCode, proxyRes.headers);
@@ -91,4 +117,4 @@ function stop() {
   if (server) { try { server.close(); } catch {} server = null; }
 }
 
-module.exports = { start, stop, proxyPort, TARGET_PATH_PREFIX };
+module.exports = { start, stop, proxyPort, TARGET_PATH_PREFIX, shapeRequest, ALLOWED_TOP_LEVEL_FIELDS, ALLOWED_MESSAGE_FIELDS };
