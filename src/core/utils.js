@@ -25,4 +25,20 @@ function normUrl(url) {
   return String(url ?? '').replace(/\/+$/, '');
 }
 
-module.exports = { sleep, runPool, normUrl };
+/**
+ * Clamp (context, input, output) so input+output <= context, output < context.
+ * Prevents VS Code "Output token reservation leaves no room in context window".
+ */
+function sanitizeLimits(contextWindow, maxInput, maxOutput) {
+  let ctx = (typeof contextWindow === 'number' && contextWindow > 0) ? contextWindow : 128000;
+  let out = (typeof maxOutput === 'number' && maxOutput > 0) ? maxOutput : 16384;
+  let inp = (typeof maxInput === 'number' && maxInput > 0) ? maxInput : null;
+  if (out >= ctx) out = Math.max(1, ctx - 1);
+  if (!inp || inp < 1) inp = Math.max(1, ctx - out);
+  if (inp + out > ctx) out = Math.max(1, ctx - inp);
+  if (inp <= 0) { inp = 1; out = Math.max(1, ctx - 1); }
+  if (out <= 0) out = 1;
+  return { contextWindow: ctx, maxInputTokens: inp, maxOutputTokens: out };
+}
+
+module.exports = { sleep, runPool, normUrl, sanitizeLimits };

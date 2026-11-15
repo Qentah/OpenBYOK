@@ -1,6 +1,7 @@
 'use strict';
 
 const { getJson } = require('../services/http');
+const { sanitizeLimits } = require('../utils');
 const tokenStore = require('../services/token-store');
 
 const proxy = require('../services/proxy');
@@ -19,9 +20,7 @@ async function listModels() {
     const modalities = m?.modalities ?? null;
     const hasImageInput = Array.isArray(modalities?.input) &&
       modalities.input.some((x) => String(x).startsWith('image'));
-    const contextWindow = m?.limit?.context ?? 128000;
-    const maxOutput = m?.limit?.output ?? 16384;
-    const maxInput = m?.limit?.input ?? (contextWindow && maxOutput ? contextWindow - maxOutput : contextWindow);
+    const limits = sanitizeLimits(m?.limit?.context, m?.limit?.input, m?.limit?.output);
     const reasoningEfforts = Array.isArray(caps?.reasoning?.effort) ? caps.reasoning.effort : null;
     rows.push({
       provider: 'opencode-go',
@@ -37,9 +36,9 @@ async function listModels() {
       toolCalling: caps?.tools?.supported === true,
       reasoning: caps?.reasoning?.supported === true,
       reasoningEfforts,
-      contextWindow,
-      maxInputTokens: maxInput,
-      maxOutputTokens: maxOutput,
+      contextWindow: limits.contextWindow,
+      maxInputTokens: limits.maxInputTokens,
+      maxOutputTokens: limits.maxOutputTokens,
       baseURL: goBaseUrl(),
       prompt: 'Réponds en une phrase courte : qu\'est-ce que la gravité ?',
     });

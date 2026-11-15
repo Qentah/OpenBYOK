@@ -4,6 +4,7 @@ const vscode = require('vscode');
 
 const tokenStore = require('./core/services/token-store');
 const benchCache = require('./core/services/bench-cache');
+const vsConfig = require('./core/services/vscode-config');
 const proxy = require('./core/services/proxy');
 const logger = require('./core/services/logger');
 
@@ -17,6 +18,7 @@ function activate(context) {
   proxy.start();
   tokenStore.init(context.secrets);
   benchCache.load();
+  try { vsConfig.repairModelLimits(); } catch {}
 
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBarItem.command = 'openbyok.selectFromBenchmark';

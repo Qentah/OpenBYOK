@@ -242,6 +242,7 @@ async function selectModels() {
 
   vsConfig.upsertChatLanguageModel(byokEntry);
   try { vsConfig.ensureInputDefinition(); } catch (e) { /* best effort */ }
+  try { vsConfig.repairModelLimits(); } catch (e) { /* best effort */ }
 
   if (apiKeyRef) {
     const reload = await vscode.window.showInformationMessage(

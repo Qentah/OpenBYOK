@@ -64,9 +64,36 @@ function ensureInputDefinition() {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
 }
 
+function repairModelLimits() {
+  const clmPath = getChatLanguageModelsPath();
+  let clm = readJsonSafe(clmPath, []);
+  if (!Array.isArray(clm)) return;
+  let changed = false;
+  for (const entry of clm) {
+    for (const m of (entry?.models ?? [])) {
+      const out = Number(m?.maxOutputTokens);
+      let inp = Number(m?.maxInputTokens);
+      if (!Number.isFinite(out) || out <= 0) continue;
+      if (m.maxOutputTokens > 200000) { m.maxOutputTokens = 131072; changed = true; out = 131072; }
+      // VS Code treats context = maxInputTokens + maxOutputTokens and rejects
+      // configs where the output reservation leaves no room. A missing/zero
+      // (or too small) input makes the context window too small for the large
+      // static system prompts Copilot sends -> "exceed context budget".
+      if (!Number.isFinite(inp) || inp < 32768) {
+        m.maxInputTokens = Math.max(out, 65536);
+        changed = true;
+      }
+    }
+  }
+  if (changed) {
+    const tmp = clmPath + '.tmp';
+    try { fs.writeFileSync(tmp, JSON.stringify(clm, null, 2)); fs.renameSync(tmp, clmPath); } catch { /* best effort */ }
+  }
+}
+
 function readChatLanguageModels() {
   const clm = readJsonSafe(getChatLanguageModelsPath(), []);
   return Array.isArray(clm) ? clm : [];
 }
 
-module.exports = { userSettingsPath, getChatLanguageModelsPath, readJsonSafe, upsertChatLanguageModel, ensureInputDefinition, readChatLanguageModels };
+module.exports = { userSettingsPath, getChatLanguageModelsPath, readJsonSafe, upsertChatLanguageModel, ensureInputDefinition, readChatLanguageModels, repairModelLimits };

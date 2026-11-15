@@ -5,7 +5,7 @@ const { getJson, postJson } = require('../services/http');
 const tokenStore = require('../services/token-store');
 const benchCache = require('../services/bench-cache');
 const { CONSOLE_API, CATALOGUE_API, DEFAULT_SERVER, CLIENT_ID, BENCH_PROMPT } = require('../constants');
-const { normUrl, sleep } = require('../utils');
+const { normUrl, sleep, sanitizeLimits } = require('../utils');
 
 /* ---------- Catalogue / config consolidation ---------- */
 
@@ -27,21 +27,54 @@ async function fetchCatalogue() {
   return data;
 }
 
+function hostOf(url) {
+  try { return new URL(url).host.toLowerCase(); } catch { return ''; }
+}
+
 function indexCatalogue(cat) {
+  // Store ALL matching catalogue entries per model id so the caller can pick
+  // the one whose endpoint matches the provider's baseURL (limits differ by
+  // host — e.g. glm-4.7-flash has sane limits on z.ai but broken ones on
+  // cortecs where output == context).
   const index = new Map();
   function walk(obj) {
     if (typeof obj !== 'object' || obj === null) return;
     if (Array.isArray(obj)) { obj.forEach(walk); return; }
     if (typeof obj.id === 'string' && obj.type === 'chat') {
-      const baseUrl = obj?.api?.['chat-completions']?.base_url ?? '';
-      const isNvidia = baseUrl.includes('nvidia.com');
-      if (isNvidia || !index.has(obj.id)) index.set(obj.id, obj);
+      const arr = index.get(obj.id) ?? [];
+      arr.push(obj);
+      index.set(obj.id, arr);
     }
     for (const v of Object.values(obj)) walk(v);
   }
   walk(cat);
   return index;
 }
+
+function isSaneLimits(e) {
+  const ctx = e?.limit?.context;
+  const out = e?.limit?.output;
+  return typeof ctx === 'number' && ctx > 0 && typeof out === 'number' && out > 0 && out < ctx;
+}
+
+function pickCatalogueEntry(entries, providerBaseURL) {
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  if (entries.length === 1) return entries[0];
+  const providerHost = hostOf(providerBaseURL);
+  // Prefer entries with sane limits (output < context) — broken catalogue
+  // entries where output == context cause "leaves no room" errors in VS Code.
+  const sane = entries.filter(isSaneLimits);
+  const pool = sane.length ? sane : entries;
+  const hostMatch = pool.find((e) => {
+    const bu = e?.api?.['chat-completions']?.base_url;
+    return bu && hostOf(bu) === providerHost && providerHost !== '';
+  });
+  if (hostMatch) return hostMatch;
+  const nvidia = pool.find((e) => String(e?.api?.['chat-completions']?.base_url ?? '').includes('nvidia.com'));
+  if (nvidia) return nvidia;
+  return pool[0];
+}
+
 
 function collectChatModels(config, catIndex) {
   const rows = [];
@@ -56,7 +89,8 @@ function collectChatModels(config, catIndex) {
       const chatCapable = !caps || (caps.input?.includes('text') && caps.output?.includes('text'));
       if (!chatCapable) continue;
 
-      const c = catIndex.get(mid);
+      const catEntries = catIndex.get(mid);
+      const c = pickCatalogueEntry(catEntries, p.settings.baseURL);
       const modalities = c?.modalities ?? null;
       const hasImageInput = Array.isArray(modalities?.input) &&
         modalities.input.some((x) => String(x).startsWith('image'));
@@ -64,6 +98,7 @@ function collectChatModels(config, catIndex) {
       const contextWindow = c?.limit?.context ?? null;
       const maxOutput = c?.limit?.output ?? null;
       const maxInput = c?.limit?.input ?? (contextWindow && maxOutput ? contextWindow - maxOutput : null);
+      const limits = sanitizeLimits(contextWindow, maxInput, maxOutput);
 
       rows.push({
         provider: 'opencode',
@@ -79,9 +114,9 @@ function collectChatModels(config, catIndex) {
         toolCalling: catCaps?.tools?.supported === true,
         reasoning: catCaps?.reasoning?.supported === true,
         reasoningEfforts: Array.isArray(catCaps?.reasoning?.effort) ? catCaps.reasoning.effort : null,
-        contextWindow,
-        maxInputTokens: maxInput ?? 128000,
-        maxOutputTokens: maxOutput ?? 16384,
+        contextWindow: limits.contextWindow,
+        maxInputTokens: limits.maxInputTokens,
+        maxOutputTokens: limits.maxOutputTokens,
         baseURL: p.settings.baseURL,
         prompt: BENCH_PROMPT,
       });
