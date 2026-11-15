@@ -44,10 +44,25 @@ async function generateCommitMessage(context) {
 
   try {
     const settingId = vscode.workspace.getConfiguration('openbyok').get('commitModel')?.toString().trim();
-    const model = await registry.getDefault().resolveModelFor(token, settingId);
-    const label = model.name || model.modelID;
-    if (!settingId) {
-      vscode.window.showInformationMessage(`OpenBYOK: aucun commitModel configuré — utilisation du modèle le plus rapide (${label}).`);
+      let model;
+      let label;
+      if (settingId) {
+        model = await registry.getDefault().resolveModelFor(token, settingId);
+        label = model.name || model.modelID;
+        if (!settingId) {
+          vscode.window.showInformationMessage(`OpenBYOK: commitModel configuré mais invalide — utilisation du modèle le plus rapide (${label}).`);
+        }
+      } else {
+        // No commitModel configured, select the best model automatically
+                const bestModelKey = benchmark.selectBestModelForCommit();
+        if (bestModelKey) {
+          model = await registry.getDefault().resolveModelFor(token, bestModelKey);
+          label = model.name || model.modelID;
+          vscode.window.showInformationMessage(`OpenBYOK: aucun commitModel configuré — utilisation du modèle le plus rapide (${label}).`);
+        } else {
+          vscode.window.showWarningMessage('OpenBYOK: aucun modèle disponible pour générer un message de commit.');
+          return;
+        }
     }
     vscode.window.withProgress(
       { location: vscode.ProgressLocation.Window, title: `OpenBYOK: generating commit message (${label})…` },

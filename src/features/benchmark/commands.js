@@ -67,6 +67,33 @@ async function runBackgroundBenchmark() {
   finally { running = false; }
 }
 
+/**
+ * Select the best model for inline suggestion:
+ * - Filter benchmark results to those with tokensPerSec >= minTokensPerSec
+ * - Sort by ttftMs ascending (shortest time to first token)
+ * - Return the first model's key, or null if none match
+ */
+function selectBestModelForCommit(minTokensPerSec = MIN_INLINE_SUGGESTION_TOKENS_PER_SEC) {
+  const cache = benchCache.data();
+  if (!cache?.results?.length) return null;
+
+  // Filter models meeting the token throughput requirement
+  const eligible = cache.results.filter(r => r.tokensPerSec >= minTokensPerSec);
+  if (eligible.length === 0) return null;
+
+  // Sort by TTFT (time to first token) ascending, then by spd (seconds per 1k) ascending
+  eligible.sort((a, b) => {
+    const ttftA = a.ttftMs ?? Infinity;
+    const ttftB = b.ttftMs ?? Infinity;
+    if (ttftA !== ttftB) return ttftA - ttftB;
+    const spdA = a.spd ?? Infinity;
+    const spdB = b.spd ?? Infinity;
+    return spdA - spdB;
+  });
+
+  return eligible[0]?.key ?? null;
+}
+
 async function runBenchmarkWithProgress() {
   if (running) {
     vscode.window.showInformationMessage('Benchmark already running…');
@@ -193,4 +220,4 @@ function register(context) {
   );
 }
 
-module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark };
+module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark, selectBestModelForCommit };

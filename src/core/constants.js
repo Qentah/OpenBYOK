@@ -23,4 +23,5 @@ module.exports = {
   BENCH_PROMPT: "Réponds en une phrase courte : qu'est-ce que la gravité ?",
   BENCH_SLOW_TTFT_MS: 5000,
   BENCH_SLOW_TOKENS_PER_SEC: 5,
+    MIN_INLINE_SUGGESTION_TOKENS_PER_SEC: 15,
 };
