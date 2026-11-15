@@ -164,8 +164,8 @@ async function selectModels() {
   const benchResults = group.models.map((m) => {
     const cached = benchMap.get(m.key);
     const bench = cached
-      ? { status: cached.status, ttftMs: cached.ttftMs, tokensPerSec: cached.tokensPerSec, error: cached.error }
-      : { status: 'UNKNOWN', ttftMs: null, tokensPerSec: null, error: null };
+      ? { status: cached.status, ttftMs: cached.ttftMs, tokensPerSec: cached.tokensPerSec, spd: cached.spd, error: cached.error }
+      : { status: 'UNKNOWN', ttftMs: null, tokensPerSec: null, spd: null, error: null };
     return { model: m, bench };
   });
 
