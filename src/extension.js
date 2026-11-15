@@ -37,6 +37,14 @@ function activate(context) {
   benchmark.register(context);
   opengit.register(context);
   inline.register(context);
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('openbyok.commitModel')) {
+        try { benchmark.updateStatusBar(); } catch {}
+      }
+    })
+  );
 }
 
 function deactivate() {

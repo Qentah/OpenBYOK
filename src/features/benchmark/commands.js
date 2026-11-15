@@ -19,12 +19,24 @@ function setStatusBarItem(item) { statusBarItem = item; }
 function updateStatusBar() {
   if (!statusBarItem) return;
   const cache = benchCache.data();
+  const commitModel = vscode.workspace.getConfiguration('openbyok').get('commitModel')?.toString().trim() || '';
   if (cache?.timestamp && Array.isArray(cache.results) && cache.results.length) {
+    // Reflect the user's explicit selection when set, otherwise the fastest cached model.
+    let chosen = null;
+    if (commitModel) {
+      chosen = cache.results.find((r) => r.modelID === commitModel) || null;
+    }
     const fastest = modelResolver.bestCachedModel({ sortBy: 'spd' });
+    const display = chosen || (!commitModel ? fastest : null);
+    const name = display
+      ? (display.name || display.modelID)
+      : (commitModel || (fastest ? (fastest.name || fastest.modelID) : 'cached'));
+    const spd = (display && (display.spd ?? null) != null) ? display.spd : (fastest?.spd ?? null);
+    const spdLabel = spd != null ? `${spd}s/1k` : '';
     const ageMin = Math.round((Date.now() - cache.timestamp) / 60000);
-    const spdLabel = fastest?.spd != null ? `${fastest.spd}s/1k` : '';
-    statusBarItem.text = `$(dashboard) OpenBYOK: ${fastest ? (fastest.name || fastest.modelID) : 'cached'} ${spdLabel} (${ageMin}m)`.trim();
-    statusBarItem.tooltip = `Benchmark cache: ${cache.results.length} models, ${ageMin} min ago. Click to view/select model.`;
+    statusBarItem.text = `$(dashboard) OpenBYOK: ${name} ${spdLabel} (${ageMin}m)`.trim();
+    statusBarItem.tooltip = `Benchmark cache: ${cache.results.length} models, ${ageMin} min ago. Click to view/select model.` +
+      (commitModel ? `\nCommit model: ${commitModel}` : '\nCommit model: Auto (fastest)');
   } else {
     statusBarItem.text = '$(dashboard) OpenBYOK: no cache';
     statusBarItem.tooltip = 'Click to run benchmark.';

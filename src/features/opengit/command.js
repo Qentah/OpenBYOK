@@ -50,7 +50,7 @@ async function generateCommitMessage(context) {
       let label;
       if (settingId) {
         try {
-          model = await registry.getDefault().resolveModelFor(token, settingId);
+          model = await modelResolver.resolveModelFor(token, settingId);
         } catch (e) {
           vscode.window.showErrorMessage(`OpenBYOK: ${e.message}`);
           return;
@@ -63,7 +63,7 @@ async function generateCommitMessage(context) {
           return;
         }
         try {
-          model = await registry.getDefault().resolveModelFor(token, best.key ?? best.modelID);
+          model = await modelResolver.resolveModelFor(token, best.key ?? best.modelID);
         } catch {
           model = { baseURL: best.baseURL, modelID: best.modelID, name: best.name, prompt: require('../../core/constants').BENCH_PROMPT };
         }
@@ -123,6 +123,7 @@ async function selectCommitModel() {
   if (!pick) return;
   const cfg = vscode.workspace.getConfiguration('openbyok');
   await cfg.update('commitModel', pick.modelID, vscode.ConfigurationTarget.Global);
+  try { benchmark.updateStatusBar(); } catch (e) {}
   vscode.window.showInformationMessage(`Commit model set to ${pick.label} (${pick.modelID}).`);
 }
 

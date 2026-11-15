@@ -1,6 +1,5 @@
 'use strict';
 
-const vscode = require('vscode');
 const tokenStore = require('./token-store');
 const benchCache = require('./bench-cache');
 const registry = require('../providers/registry');
