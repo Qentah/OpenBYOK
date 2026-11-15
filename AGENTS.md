@@ -20,7 +20,7 @@ Ce document et `README.md` sont traités comme du code : leur mise à jour fait 
 
 Une modification cosmétique (typo, commentaire, log) ne déclenche **pas** cette boucle — sinon elle serait abandonnée. Le critère de déclenchement est : *un lecteur de ce document risquerait désormais d'écrire du code faux*.
 
-> Dernière vérification code : 2026-11-14 (alignement docs sur le code : 11 commandes, proxy/logger/telemetry/services, registry multi-provider, bench configurable, reload auto, status bar, QuickPick commit/benchmark).
+> Dernière vérification code : 2026-11-14 (alignement docs sur le code : 11 commandes, inline completion, proxy/logger/telemetry/services, registry multi-provider, bench configurable, reload auto, status bar, QuickPick commit/benchmark).
 
 ---
 
@@ -54,11 +54,12 @@ vscode/
     └── features/
         ├── byok/commands.js        # registerToken, selectModels, configureApiKey, refreshToken, logout, removeGroup
         ├── benchmark/{benchmark,commands}.js  # benchmark, cache, status bar, sélection modèle
-        └── opengit/command.js      # génération de message de commit + sélection modèle commit
+            ├── opengit/command.js      # génération de message de commit + sélection modèle commit
+            └── inline/completion.js    # inline completion provider (ghost text / next edit suggestion)
 ```
 
 Règles d'architecture (à respecter dans toute modification) :
-- `extension.js` ne contient que le wiring `activate()`/`deactivate()` (init services/proxy/status bar + `feature.register(context)`), pas de logique métier.
+- `extension.js` ne contient que le wiring `activate()`/`deactivate()` (init services/proxy/status bar + `feature.register(context)`), pas de logique métier. Inclut l'enregistrement du provider d'inline completion (ghost text / next edit suggestion).
 - Chaque feature expose `register(context)` ; les chemins `require` depuis `features/*` sont `../../core/...` (2 niveaux).
 - Le core ne parle aux fournisseurs que via `registry` (interface : `listModels`, `findModelById`, `deviceLogin`/`refreshToken`/`resolveModelFor`/`cliExportToken`/`cliAvailable` optionnels). Ajouter un provider = un module + une entrée dans `registry.js`.
 - `http.js` = REST générique ; `chat.js` = chat completions. Ne pas remélanger.

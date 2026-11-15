@@ -16,6 +16,7 @@ and `src/features/` (byok, benchmark, opengit).
 - Console token stored in VS Code SecretStorage (encrypted, OS-level) with automatic refresh + retry-on-401 network wrapper (`authFetch`)
 - Background benchmark cache (`~/.openbyok-benchmark-cache.json`, TTL 2 h) refreshed only when expired (and token available), cancellable progress command, status bar item, configurable timeout/concurrency
 - Commit message generation: generates a conventional commit message from the git diff and prefills the Source Control input box (never commits directly); commit model selectable (Auto/fastest or chosen from benchmark cache)
+- Inline completion (ghost text & next edit suggestion) triggered by `@openbyok` or `byok:` syntax, providing command suggestions via VS Code IntelliSense
 - OutputChannel `OpenBYOK` logging; local proxy for OpenCode Go (configurable port)
 
 ## Installation (from source — no compilation needed)

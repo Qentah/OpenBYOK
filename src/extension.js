@@ -10,6 +10,7 @@ const logger = require('./core/services/logger');
 const byok = require('./features/byok/commands');
 const benchmark = require('./features/benchmark/commands');
 const opengit = require('./features/opengit/command');
+const inline = require('./features/inline/completion');
 
 function activate(context) {
   logger.init();
@@ -23,7 +24,7 @@ function activate(context) {
   benchmark.setStatusBarItem(statusBarItem);
   benchmark.updateStatusBar();
   statusBarItem.show();
-
+  
   if (!benchCache.isFresh()) {
     tokenStore.getToken().then(() => {
       benchmark.runBackgroundBenchmark().then(() => benchmark.updateStatusBar()).catch((e) => logger.warn('background benchmark failed', e));
@@ -33,6 +34,7 @@ function activate(context) {
   byok.register(context);
   benchmark.register(context);
   opengit.register(context);
+  inline.register(context);
 }
 
 function deactivate() {
