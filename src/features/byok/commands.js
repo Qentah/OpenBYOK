@@ -343,7 +343,8 @@ async function removeGroup() {
   const filtered = all.filter((e) => String(e?.name ?? '') !== pick.label);
   const clmPath = vsConfig.getChatLanguageModelsPath();
   const fs = require('fs');
-  fs.writeFileSync(clmPath, JSON.stringify(filtered, null, 2));
+  fs.writeFileSync(clmPath + '.tmp', JSON.stringify(filtered, null, 2));
+  fs.renameSync(clmPath + '.tmp', clmPath);
   // Remove orphaned input declarations that no longer referenced.
   try { vsConfig.ensureInputDefinition(); } catch {}
   vscode.window.showInformationMessage(`Removed group "${pick.label}". Reload the window to apply.`);
