@@ -31,20 +31,11 @@ You can install it directly from the source folder and modify the code on the fl
 3. Select the `vscode/` folder
 4. The extension is now active — edit any file under `src/` and reload the window (`Ctrl+Shift+P` → "Developer: Reload Window") to apply changes
 
-### Option B — Symlink into extensions folder
-
-```bash
-# Windows (PowerShell, run as admin or enable developer mode)
-New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.vscode\extensions\openbyok" -Target "REDACTED_LOCAL_PATH"
-```
-
-Then reload VS Code. Any edit under `src/` takes effect after a window reload.
-
-### Option C — Package as .vsix (no compile)
+### Option B — Package as .vsix (no compile)
 
 ```bash
 npm install -g @vscode/vsce
-cd vscode/
+cd <folder containing vscode/>
 vsce package --no-dependencies
 # produces openbyok-0.1.0.vsix
 code --install-extension openbyok-0.1.0.vsix
