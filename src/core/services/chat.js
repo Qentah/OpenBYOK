@@ -18,6 +18,11 @@ async function chatCompletion(baseURL, modelID, token, prompt, timeoutMs = 60000
   const url = `${normUrl(baseURL)}/chat/completions`;
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
+  const body = JSON.stringify({
+    model: modelID,
+    messages: [{ role: 'user', content: prompt }],
+    stream: false,
+  });
   const init = {
     method: 'POST',
     signal: ac.signal,
@@ -26,11 +31,7 @@ async function chatCompletion(baseURL, modelID, token, prompt, timeoutMs = 60000
       Accept: 'application/json',
       'x-opencode-session': sessionId(),
     },
-    body: JSON.stringify({
-      model: modelID,
-      messages: [{ role: 'user', content: prompt }],
-      stream: false,
-    }),
+    body,
   };
   try {
     const res = await tokenStore.authFetch(url, init);
@@ -57,24 +58,18 @@ async function chatCompletionStream(baseURL, modelID, token, prompt, onToken, si
     messages: [{ role: 'user', content: prompt }],
     stream: true,
   });
-  const doFetch = async () => {
-    const t = await tokenStore.getToken();
-    return fetch(url, {
-      method: 'POST',
-      signal,
-      headers: {
-        Authorization: `Bearer ${t}`,
-        'content-type': 'application/json',
-        'x-opencode-session': sessionId(),
-      },
-      body,
-    });
-  };
-  let res = await doFetch();
-  if (res.status === 401) {
-    try { await tokenStore.refreshToken(); } catch { /* ignore */ }
-    res = await doFetch();
-  }
+  // Single retry-on-401 transport: authFetch handles token injection + refresh.
+  // authFetch uses fetch internally; stream reads from res.body.
+  const res = await tokenStore.authFetch(url, {
+    method: 'POST',
+    signal,
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      'x-opencode-session': sessionId(),
+    },
+    body,
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`HTTP ${res.status} — ${text.slice(0, 120)}`);
