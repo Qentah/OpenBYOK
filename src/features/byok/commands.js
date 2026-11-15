@@ -1,4 +1,4 @@
-'use strict';
+﻿﻿﻿'use strict';
 
 const vscode = require('vscode');
 const tokenStore = require('../../core/services/token-store');
@@ -6,6 +6,7 @@ const benchCache = require('../../core/services/bench-cache');
 const modelResolver = require('../../core/services/model-resolver');
 const vsConfig = require('../../core/services/vscode-config');
 const registry = require('../../core/providers/registry');
+const modelCatalogue = require('../../core/services/model-catalogue');
 const { normUrl } = require('../../core/utils');
 const benchmark = require('../benchmark/commands');
 
@@ -91,22 +92,18 @@ async function logout() {
 /* ---------- selectModels ---------- */
 
 async function selectModels() {
-  let models = [];
   let token;
   try {
     token = await tokenStore.getToken();
-    for (const provider of registry.list()) {
-      try {
-        const pm = await provider.listModels(token);
-        if (Array.isArray(pm)) models = models.concat(pm);
-      } catch (e) {
-        vscode.window.showWarningMessage(`Provider ${provider.id}: ${e.message}`);
-      }
-    }
   } catch (e) {
     vscode.window.showErrorMessage(e.message);
     return;
   }
+  const cat = await modelCatalogue.listAll(token, {
+    onError: (pid, e) => vscode.window.showWarningMessage(`Provider ${pid}: ${e.message}`),
+  });
+  const models = cat.models;
+
   if (models.length === 0) {
     vscode.window.showWarningMessage('No chat models found.');
     return;
@@ -356,4 +353,11 @@ function register(context) {
 }
 
 module.exports = { register, registerToken, selectModels, configureApiKey, refreshToken, logout, removeGroup };
+
+
+
+
+
+
+
 

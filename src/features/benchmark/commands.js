@@ -1,9 +1,10 @@
-'use strict';
+﻿'use strict';
 
 const vscode = require('vscode');
 const tokenStore = require('../../core/services/token-store');
 const benchCache = require('../../core/services/bench-cache');
 const registry = require('../../core/providers/registry');
+const modelCatalogue = require('../../core/services/model-catalogue');
 const { runPool } = require('../../core/utils');
 const { benchmarkModel, toCacheEntry } = require('./benchmark');
 const { BENCH_TIMEOUT_MS, BENCH_CONCURRENCY } = require('../../core/constants');
@@ -56,14 +57,8 @@ async function runBackgroundBenchmark() {
   running = true;
   try {
     const token = await tokenStore.getToken();
-    const resultsByProvider = new Map();
-    for (const provider of registry.list()) {
-      try {
-        const pm = await provider.listModels(token);
-        resultsByProvider.set(provider.id, Array.isArray(pm) ? pm : []);
-      } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ resultsByProvider.set(provider.id, []); }
-    }
-    const models = enumerateModels(registry.list(), resultsByProvider);
+    const cat = await modelCatalogue.listAll(token, { providers: registry.list(), benchableOnly: true });
+    const models = cat.models;
     if (models.length === 0) return;
     const { timeout, concurrency } = benchConfig();
     const results = await runPool(
@@ -106,14 +101,8 @@ async function runBenchmarkWithProgress() {
         const providers = providerChoice === 'All providers'
           ? registry.list()
           : [registry.get(providerChoice)];
-        const resultsByProvider = new Map();
-        for (const provider of providers) {
-          try {
-            const pm = await provider.listModels(token);
-            resultsByProvider.set(provider.id, Array.isArray(pm) ? pm : []);
-          } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ resultsByProvider.set(provider.id, []); }
-        }
-        const models = enumerateModels(providers, resultsByProvider);
+        const cat = await modelCatalogue.listAll(token, { providers, benchableOnly: true });
+        const models = cat.models;
         if (models.length === 0) {
           vscode.window.showWarningMessage('No chat models found.');
           return;
@@ -206,3 +195,4 @@ function register(context) {
 }
 
 module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark };
+
