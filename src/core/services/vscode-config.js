@@ -91,7 +91,7 @@ function repairModelLimits() {
   let changed = false;
   for (const entry of clm) {
     for (const m of (entry?.models ?? [])) {
-      const out = Number(m?.maxOutputTokens);
+      let out = Number(m?.maxOutputTokens);
       let inp = Number(m?.maxInputTokens);
       if (!Number.isFinite(out) || out <= 0) continue;
       if (m.maxOutputTokens > 200000) { m.maxOutputTokens = 131072; changed = true; out = 131072; }
