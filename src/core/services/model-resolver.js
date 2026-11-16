@@ -45,9 +45,10 @@ function bestCachedModel({ minTokensPerSec = 0, sortBy = 'spd' } = {}) {
 }
 
 /**
- * Resolve a model from a configured setting id, or fall back to the benchmark
- * cache (fastest by spd). Returns a full catalogue model when the token is
- * available, otherwise a minimal { baseURL, modelID, name, prompt } object.
+ * Internal helper: resolve a model from a configured setting id, or fall back to
+ * the benchmark cache (fastest by spd). Returns a full catalogue model when the
+ * token is available, otherwise a minimal { baseURL, modelID, name, prompt }
+ * object.
  *
  * Throws when settingId is given but cannot be resolved (callers decide whether
  * to fall back to the cache).
@@ -75,22 +76,43 @@ async function resolveModelFor(token, settingId) {
 }
 
 /**
- * High-level resolution used by features: setting first, then cache fallback
- * (fastest model). Returns a model object or null (never throws).
+ * Single high-level entry point used by features: setting first, then cache
+ * fallback. Returns a full catalogue model when a token is available, else a
+ * minimal cached object. Never throws; null only when nothing is available.
+ *
+ * Optional policy knobs are forwarded to the cache selection:
+ *   - minTokensPerSec: drop cached results below this throughput (0 = no filter)
+ *   - sortBy: 'spd' (overall speed) or 'ttft' (responsiveness)
  */
-async function resolveModel({ settingId } = {}) {
-  if (settingId) {
-    try {
-      const token = await tokenStore.getToken();
-      const m = await resolveModelFor(token, settingId);
-      if (m?.baseURL && m?.modelID) return m;
-    } catch { /* fall through to cache */ }
+async function resolveModel({ settingId, minTokensPerSec = 0, sortBy = 'spd' } = {}) {
+  let token = null;
+  try { token = await tokenStore.getToken(); } catch { token = null; }
+
+  // Setting-id branch: full catalogue model when token available.
+  if (settingId && token) {
+    for (const provider of registry.list()) {
+      if (typeof provider.findModelById !== 'function') continue;
+      try {
+        const m = await provider.findModelById(token, settingId);
+        if (m?.baseURL && m?.modelID) return m;
+      } catch { /* try next provider */ }
+    }
   }
-  const cached = bestCachedModel({ sortBy: 'spd' });
-  if (cached?.baseURL && cached?.modelID) {
-    return { baseURL: cached.baseURL, modelID: cached.modelID, name: cached.name, prompt: BENCH_PROMPT };
+
+  // Cache fallback.
+  const cached = bestCachedModel({ minTokensPerSec, sortBy });
+  if (!cached?.baseURL || !cached?.modelID) return null;
+
+  if (token) {
+    for (const provider of registry.list()) {
+      if (typeof provider.findModelById !== 'function') continue;
+      try {
+        const m = await provider.findModelById(token, cached.key ?? cached.modelID);
+        if (m?.baseURL && m?.modelID) return m;
+      } catch { /* try next provider */ }
+    }
   }
-  return null;
+  return { baseURL: cached.baseURL, modelID: cached.modelID, name: cached.name, prompt: BENCH_PROMPT };
 }
 
 module.exports = {

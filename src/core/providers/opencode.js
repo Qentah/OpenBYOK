@@ -193,7 +193,7 @@ async function refreshToken() {
 
 /* ---------- Model resolution for features (e.g. OpenBYOK) ---------- */
 
-/** Setting openbyok.commitModel > best cached benchmark > error. Delegated to model-resolver. */
+/** Internal (kept for provider interface compliance): delegates to model-resolver. Features call model-resolver directly. */
 async function resolveModelFor(token, settingId) {
   return modelResolver.resolveModelFor(token, settingId);
 }
