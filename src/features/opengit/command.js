@@ -49,23 +49,17 @@ async function generateCommitMessage(context) {
       let model;
       let label;
       if (settingId) {
-        try {
-          model = await modelResolver.resolveModelFor(token, settingId);
-        } catch (e) {
-          vscode.window.showErrorMessage(`OpenBYOK: ${e.message}`);
+        model = await modelResolver.resolveModel({ settingId });
+        if (!model) {
+          vscode.window.showWarningMessage('OpenBYOK: aucun modèle disponible pour générer un message de commit.');
           return;
         }
         label = model.name || model.modelID;
       } else {
-        const best = modelResolver.bestCachedModel({ sortBy: 'spd' });
-        if (!best) {
+        model = await modelResolver.resolveModel({});
+        if (!model) {
           vscode.window.showWarningMessage('OpenBYOK: aucun modèle disponible pour générer un message de commit.');
           return;
-        }
-        try {
-          model = await modelResolver.resolveModelFor(token, best.key ?? best.modelID);
-        } catch {
-          model = { baseURL: best.baseURL, modelID: best.modelID, name: best.name, prompt: require('../../core/constants').BENCH_PROMPT };
         }
         label = model.name || model.modelID;
         vscode.window.showInformationMessage(`OpenBYOK: aucun commitModel configuré — utilisation du modèle le plus rapide (${label}).`);
