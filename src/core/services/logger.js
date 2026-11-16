@@ -36,7 +36,7 @@ function line(level, msg, err) {
     };
     // Send telemetry via VS Code's telemetry API (if available)
     try {
-      vscode?.telemetry?.sendEvent('OpenBYOK', event);
+        vscode?.telemetry?.sendTelemetryEvent?.('OpenBYOK', event);
     } catch (e) {
       // Telemetry not available, ignore
     }
