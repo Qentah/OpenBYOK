@@ -45,7 +45,7 @@ async function generateCommitMessage(context) {
   }
 
   try {
-    vscode.window.withProgress(
+    await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Window, title: `OpenBYOK: generating commit message (${label})…` },
       async () => {
         try {
