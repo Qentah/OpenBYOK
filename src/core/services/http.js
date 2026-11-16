@@ -23,7 +23,7 @@ async function getJson(url, headers = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
       const res = await new Promise((resolve, reject) => {
         const req = https.request({
           hostname: u.hostname, port: u.port || 443, path: u.pathname + u.search,
-          method: 'GET', headers: { Accept: 'application/json', ...headers },
+          method: 'GET', headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', ...headers },
         }, (r) => {
           let data = '';
           r.on('data', (c) => (data += c));
@@ -58,7 +58,7 @@ async function postJson(url, body, headers = {}, timeoutMs = DEFAULT_TIMEOUT_MS)
         const req = https.request({
           hostname: u.hostname, port: u.port || 443, path: u.pathname + u.search,
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Content-Length': Buffer.byteLength(payload), ...headers },
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Content-Length': Buffer.byteLength(payload), 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', ...headers },
         }, (r) => {
           let data = '';
           r.on('data', (c) => (data += c));
