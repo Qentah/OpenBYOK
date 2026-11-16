@@ -2,7 +2,7 @@
   "name": "openbyok",
   "displayName": "MultiProvider x OpenCode BYOK",
   "description": "Register models as VS Code BYOK (Bring Your Own Key) from OpenCode API linked to different providers (OpenAI, Azure OpenAI, Anthropic, Google Gemini, etc.)",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "publisher": "qentah",
   "engines": { "vscode": "^1.95.0" },
   "categories": ["Other", "Machine Learning", "AI"],
