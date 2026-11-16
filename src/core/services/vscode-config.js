@@ -23,6 +23,7 @@ function writeChatLanguageModels(entries) {
   const clmPath = getChatLanguageModelsPath();
   const tmp = clmPath + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(entries, null, 2));
+  try { fs.chmodSync(tmp, 0o600); } catch {}
   fs.renameSync(tmp, clmPath);
   return entries;
 }
@@ -73,7 +74,10 @@ function ensureInputDefinition() {
     );
   }
 
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
+  const tmpSettings = settingsPath + '.tmp';
+  fs.writeFileSync(tmpSettings, JSON.stringify(settings, null, 4));
+  try { fs.chmodSync(tmpSettings, 0o600); } catch {}
+  fs.renameSync(tmpSettings, settingsPath);
 }
 
 function syncByokConfig() {
