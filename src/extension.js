@@ -18,7 +18,7 @@ function activate(context) {
   proxy.start();
   tokenStore.init(context.secrets);
   benchCache.load();
-  try { vsConfig.repairModelLimits(); } catch {}
+  try { vsConfig.syncByokConfig(); } catch {}
 
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBarItem.command = 'openbyok.selectFromBenchmark';

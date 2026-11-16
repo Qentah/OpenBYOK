@@ -76,6 +76,14 @@ function ensureInputDefinition() {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 4));
 }
 
+function syncByokConfig() {
+  // Consolidated BYOK config sync pass: repair input definitions first
+  // (so `${input:...}` references resolve), then model limits (so context
+  // budgets are valid). Single entry point for callers.
+  try { ensureInputDefinition(); } catch (e) { /* best effort */ }
+  try { repairModelLimits(); } catch (e) { /* best effort */ }
+}
+
 function repairModelLimits() {
   const clmPath = getChatLanguageModelsPath();
   let clm = readJsonSafe(clmPath, []);
@@ -108,4 +116,4 @@ function readChatLanguageModels() {
   return Array.isArray(clm) ? clm : [];
 }
 
-module.exports = { userSettingsPath, getChatLanguageModelsPath, readJsonSafe, writeChatLanguageModels, upsertChatLanguageModel, removeChatLanguageModel, listOpenByokGroups, ensureInputDefinition, readChatLanguageModels, repairModelLimits };
+module.exports = { userSettingsPath, getChatLanguageModelsPath, readJsonSafe, writeChatLanguageModels, upsertChatLanguageModel, removeChatLanguageModel, listOpenByokGroups, ensureInputDefinition, readChatLanguageModels, repairModelLimits, syncByokConfig };
