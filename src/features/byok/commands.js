@@ -239,8 +239,7 @@ async function selectModels() {
   byokEntry.apiKey = apiKeyRef ?? '';
 
   vsConfig.upsertChatLanguageModel(byokEntry);
-  try { vsConfig.ensureInputDefinition(); } catch (e) { /* best effort */ }
-  try { vsConfig.repairModelLimits(); } catch (e) { /* best effort */ }
+  try { vsConfig.syncByokConfig(); } catch (e) { /* best effort */ }
 
   if (apiKeyRef) {
     const reload = await vscode.window.showInformationMessage(
@@ -336,8 +335,8 @@ async function removeGroup() {
   );
   if (!pick) return;
   vsConfig.removeChatLanguageModel(pick.label);
-  // Remove orphaned input declarations that no longer referenced.
-  try { vsConfig.ensureInputDefinition(); } catch {}
+  // Sync config: repair input definitions + model limits.
+  try { vsConfig.syncByokConfig(); } catch {}
   vscode.window.showInformationMessage(`Removed group "${pick.label}". Reload the window to apply.`);
 }
 
