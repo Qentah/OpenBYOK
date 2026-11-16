@@ -187,6 +187,7 @@ async function deviceLogin(noBrowser = false) {
 async function refreshToken() {
   _consoleCache = { data: null, ts: 0 };
   _catalogueCache = { data: null, ts: 0 };
+  // Force re-fetch on next call (no-op guard already covered above).
   await tokenStore.refreshToken();
   vscode.window.showInformationMessage('Token refreshed.');
 }
