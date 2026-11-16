@@ -58,14 +58,8 @@ function benchConfig() {
  * Returns the saved results array.
  */
 async function runBenchmark({ providers, progress, cancelToken, token }) {
-  const resultsByProvider = new Map();
-  for (const provider of providers) {
-    try {
-      const pm = await provider.listModels(token);
-      resultsByProvider.set(provider.id, Array.isArray(pm) ? pm : []);
-    } catch (e) { logger.warn('provider listModels failed', e); /* skip provider */ resultsByProvider.set(provider.id, []); }
-  }
-  const models = enumerateModels(providers, resultsByProvider);
+  const cat = await modelCatalogue.listAll(token, { providers, benchableOnly: true });
+  const models = cat.models;
   if (models.length === 0) {
     if (progress) vscode.window.showWarningMessage('No chat models found.');
     return [];
@@ -103,17 +97,7 @@ async function runBackgroundBenchmark() {
   running = true;
   try {
     const token = await tokenStore.getToken();
-    const cat = await modelCatalogue.listAll(token, { providers: registry.list(), benchableOnly: true });
-    const models = cat.models;
-    if (models.length === 0) return;
-    const { timeout, concurrency } = benchConfig();
-    const results = await runPool(
-      models,
-      (m) => benchmarkModel(m, token, timeout).then((r) => toCacheEntry(m, r)),
-      concurrency
-    );
-    benchCache.save(results);
-    updateStatusBar();
+    await runBenchmark({ providers: registry.list(), progress: null, cancelToken: null, token });
   } catch (e) { logger.warn('background benchmark failed', e); /* silent in background */ }
   finally { running = false; }
 }
@@ -147,33 +131,7 @@ async function runBenchmarkWithProgress() {
         const providers = providerChoice === 'All providers'
           ? registry.list()
           : [registry.get(providerChoice)];
-        const cat = await modelCatalogue.listAll(token, { providers, benchableOnly: true });
-        const models = cat.models;
-        if (models.length === 0) {
-          vscode.window.showWarningMessage('No chat models found.');
-          return;
-        }
-        progress.report({ message: `0/${models.length} models…` });
-        let done = 0;
-        const results = await runPool(
-          models,
-          async (m) => {
-            if (cancelToken.isCancellationRequested) return null;
-            const { timeout } = benchConfig();
-            const r = await benchmarkModel(m, token, timeout);
-            done++;
-            progress.report({
-              message: `${done}/${models.length} — ${m.key} → ${r.status}`,
-              increment: 100 / models.length,
-            });
-            return toCacheEntry(m, r);
-          },
-          benchConfig().concurrency
-        );
-        const valid = results.filter(Boolean);
-        benchCache.save(valid);
-        updateStatusBar();
-        vscode.window.showInformationMessage(`Benchmark complete: ${valid.length} models cached.`);
+        await runBenchmark({ providers, progress, cancelToken, token });
       }
     );
     return true;
@@ -240,5 +198,5 @@ function register(context) {
   );
 }
 
-module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark };
+module.exports = { register, runBackgroundBenchmark, runBenchmarkWithProgress, runBenchmark, clearCache, setStatusBarItem, updateStatusBar, selectFromBenchmark };
 
