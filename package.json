@@ -59,24 +59,6 @@
       { "command": "openbyok.generateCommitMessage", "title": "OpenBYOK: Générer un message de commit", "icon": "$(git-commit)" },
       { "command": "openbyok.selectCommitModel", "title": "OpenBYOK: Select Commit Model" }
     ],
-    "languageModelChatProviders": [
-      {
-        "vendor": "openbyok",
-        "displayName": "OpenBYOK",
-        "configuration": {
-          "type": "object",
-          "required": ["apiKey"],
-          "properties": {
-            "apiKey": {
-              "type": "string",
-              "title": "OpenBYOK API Key",
-              "description": "Enter your OpenCode key (oc_sk_…). Stored natively by VS Code.",
-              "secret": true
-            }
-          }
-        }
-      }
-    ],
     "menus": {
       "scm/title": [
         {
