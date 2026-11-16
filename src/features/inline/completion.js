@@ -12,7 +12,7 @@ const MAX_PREFIX_CHARS = 4000;
 const MAX_SUFFIX_CHARS = 600;
 const COMPLETION_TIMEOUT_MS = 8000;
 
-let lastRequestAt = 0;
+const lastRequestByDocument = new Map();
 const MIN_INTERVAL_MS = 150;
 
 async function resolveModel() {
@@ -45,8 +45,9 @@ Completion:`;
 
 async function provideInlineCompletionItems(document, position, context, token) {
   const now = Date.now();
-  if (now - lastRequestAt < MIN_INTERVAL_MS) return [];
-  lastRequestAt = now;
+  const last = lastRequestByDocument.get(document.uri.toString()) || 0;
+  if (now - last < MIN_INTERVAL_MS) return [];
+  lastRequestByDocument.set(document.uri.toString(), now);
 
   if (token?.isCancellationRequested) return [];
 
